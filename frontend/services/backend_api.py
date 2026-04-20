@@ -1,4 +1,5 @@
 from django.core.exceptions import ValidationError
+from django.db.models import Prefetch
 from django.http import Http404
 
 from catalog.models import CardVariant
@@ -164,9 +165,19 @@ def _get_user_inventory_item(*, user, item_id):
 
 
 def _user_inventory_queryset(user):
+    active_listing_prefetch = Prefetch(
+        "market_listings",
+        queryset=MarketListing.objects.filter(
+            status=MarketListing.Status.ACTIVE,
+            quantity_available__gt=0,
+        ).order_by("id"),
+        to_attr="active_frontend_listings",
+    )
     return (
         InventoryItem.objects.filter(owner=user)
+        .filter(quantity__gt=0)
         .select_related("card_variant__card__game", "card_variant__set", "card_variant__image")
+        .prefetch_related(active_listing_prefetch)
         .order_by("card_variant__card__name", "condition")
     )
 
@@ -193,6 +204,31 @@ def _inventory_item_to_frontend(item):
         "image_url": image.image_url if image else "",
     }
     data["estimated_value"] = variant.current_value * item.quantity
+    active_listings = getattr(item, "active_frontend_listings", None)
+    if active_listings is None:
+        active_listings = item.market_listings.filter(
+            status=MarketListing.Status.ACTIVE,
+            quantity_available__gt=0,
+        ).order_by("id")
+    data["active_listings"] = [
+        {
+            "id": listing.id,
+            "quantity": listing.quantity,
+            "quantity_available": listing.quantity_available,
+            "price_per_unit": listing.unit_price,
+            "currency": listing.currency,
+            "status": listing.status,
+        }
+        for listing in active_listings
+    ]
+    data["listed_quantity"] = sum(listing["quantity_available"] for listing in data["active_listings"])
+    data["has_active_listings"] = data["listed_quantity"] > 0
+    if data["listed_quantity"] >= item.quantity:
+        data["listing_state"] = "fully_listed"
+    elif data["listed_quantity"]:
+        data["listing_state"] = "partially_listed"
+    else:
+        data["listing_state"] = "unlisted"
     return data
 
 

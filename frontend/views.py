@@ -12,7 +12,6 @@ from frontend.services.album_service import (
     CARD_VIEW,
     SET_VIEW,
     build_collection_album,
-    build_listing_album,
     build_record_browser,
     resolve_browser_view,
 )
@@ -20,7 +19,6 @@ from frontend.services.backend_api import (
     buy_marketplace_listing,
     create_marketplace_listing_for_user,
     get_collection_value,
-    list_my_active_listings,
     list_my_inventory,
 )
 from frontend.services.catalog_service import (
@@ -231,34 +229,7 @@ def collection(request):
 
 @login_required(login_url="login")
 def my_listings(request):
-    active_listings = list_my_active_listings(request.user)
-    facets = get_card_facets()
-    summary = {
-        "active_count": len(active_listings),
-        "available_quantity": sum(listing["quantity_available"] for listing in active_listings),
-        "listed_value": sum(listing["quantity_available"] * listing["price_per_unit"] for listing in active_listings),
-    }
-
-    return render(
-        request,
-        "my_listings.html",
-        {
-            "active_listings": active_listings,
-            "album": build_listing_album(active_listings, request.GET),
-            "browser": build_record_browser(
-                active_listings,
-                request.GET,
-                mode="my_listings",
-                default_view=CARD_VIEW,
-            ),
-            "summary": summary,
-            "games": facets["games"],
-            "sets": facets["sets"],
-            "rarities": facets["rarities"],
-            "languages": facets["languages"],
-            "selected_rarities": request.GET.getlist("rarity"),
-        },
-    )
+    return redirect(f"{reverse('collection')}?view=card&my_listings=listed#browser")
 
 
 def listing_detail(request, listing_id):

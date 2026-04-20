@@ -16,13 +16,14 @@ This file tracks frontend work now that `frontend/` is a sibling Django app.
 - [x] Listing detail buy form now uses the backend purchase workflow
 - [x] Authenticated users can view their collection, estimated value, owned quantities, available stock, and reserved stock
 - [x] Authenticated users can create sale listings from owned inventory on the card detail page, after opening a card from the collection album
+- [x] The collection page now owns listed-inventory discovery: listed cards stay in the collection grid with a strong gray image treatment, an over-image listed badge, and a `My Listings` filter.
 - [x] Active listing cards use "Listed by" language so listed inventory is not confused with completed sales
-- [x] Authenticated sellers can view their active listings on a dedicated page
-- [x] Collection and active listing pages use set-based album books with selected-set pages, filters, and pagination.
+- [x] The old `My Listings` page now redirects authenticated sellers to the collection listed filter instead of splitting listing management into a separate surface.
+- [x] Collection pages use set-based album books with selected-set pages, filters, and pagination.
 - [x] Catalog, marketplace listings, and collection share the same card/set/shelf browser system.
 - [x] Shared card album entries are compact enough for practical page-by-page scanning.
 - [x] Catalog album card entries use a larger card image and place value on its own row for easier scanning.
-- [x] My Listings now uses the shared card/set/shelf browser with the same left filters and defaults to card album view.
+- [x] Catalog album card images and home latest-listing images link to their detail pages.
 - [x] My Collection card view renders as a sleeve-only album page; selling is no longer exposed inside collection album slots.
 - [x] Shared browser controls clear stale Set/Game filters when moving to book-cover or shelf views, and sidebar search input switches the shared browser back to card view.
 - [x] Shared browser filter, pagination, set-book, shelf, and visualization links target the browser results anchor so full-page GET refreshes return near the active browsing controls instead of the page top.
@@ -51,6 +52,8 @@ This file tracks frontend work now that `frontend/` is a sibling Django app.
 - [x] Convert collection and active listing management surfaces from flat rows into set album views.
 - [x] Add shared visualization controls for card album, collection book cover, and game shelf views.
 - [x] Move the collection sell action from album cards to the opened card detail page.
+- [x] Show owned active listings inside the card detail `Your Copies` section so selling and monitoring listed copies share one workflow, without exposing another sell form for already-listed copies.
+- [x] Hide sold-out zero-quantity inventory rows from frontend owned collection/detail views while preserving backend listing and purchase history references.
 - [ ] Add purchase history and sales history pages for authenticated users.
 - [ ] Add authenticated user/profile display in the navbar or account page using the backend current-user endpoint.
 - [x] Replace mock-only price history with backend `PriceSnapshot` data.
@@ -62,5 +65,5 @@ This file tracks frontend work now that `frontend/` is a sibling Django app.
 - [x] Verified monthly home showcase and shared kinetic card rendering with focused frontend tests and browser checks.
 - [x] Verified shared browser filter reset behavior with focused frontend regression tests.
 - [x] Verified shared browser anchor preservation with focused frontend regression tests.
-- [x] Verified current browser unification and card-detail listing regressions with focused frontend tests.
+- [x] Verified current browser unification, listed-card overlay, sold-out ownership, and card-detail listing regressions with focused frontend tests.
 - [ ] Restore the collection add-physical-inventory flow; current `python manage.py test --keepdb frontend` failures are the photo-backed add inventory tests.

@@ -29,7 +29,7 @@ def build_record_browser(
     view = resolve_browser_view(params, default_view)
     records = list(records)
     if mode in {"collection", "my_listings"}:
-        records = _filter_records_by_catalog_params(records, params)
+        records = _filter_records_by_catalog_params(records, params, mode=mode)
 
     return {
         "mode": mode,
@@ -321,12 +321,13 @@ def _build_game_shelves(records, params):
     return sorted(result, key=lambda shelf: shelf["game"])
 
 
-def _filter_records_by_catalog_params(records, params):
+def _filter_records_by_catalog_params(records, params, *, mode):
     query = params.get("q", "").strip().lower()
     game = params.get("game", "")
     set_name = params.get("set", "")
     language = params.get("language", "")
     selected_rarities = [rarity for rarity in _getlist(params, "rarity") if rarity]
+    selected_my_listings = params.get("my_listings", "")
     min_price = _decimal_or_none(params.get("min_price", ""))
     max_price = _decimal_or_none(params.get("max_price", ""))
 
@@ -343,6 +344,8 @@ def _filter_records_by_catalog_params(records, params):
         if language and card["language"] != language:
             continue
         if selected_rarities and card["rarity"] not in selected_rarities:
+            continue
+        if mode == "collection" and selected_my_listings == "listed" and not record.get("has_active_listings"):
             continue
         if min_price is not None and price < min_price:
             continue

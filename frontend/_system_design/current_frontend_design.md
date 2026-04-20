@@ -47,17 +47,19 @@ Current backend wiring:
 Current frontend UI boundary:
 
 - Catalog/listing/home/detail pages are wired to real backend data.
-- `/collection/` is an authenticated frontend page for owned inventory, estimated value, and opening owned cards as an album.
+- `/collection/` is an authenticated frontend page for owned inventory, estimated value, listed-inventory discovery, and opening owned cards as an album.
 - Card detail pages own the listing-creation UI for authenticated owners. A user opens a card from the collection album, chooses one of their owned copies, and submits inventory item id, quantity, and price from that card-specific page.
-- `/my-listings/` is an authenticated frontend page for cards currently listed for sale.
-- The collection and active-listings pages present inventory as set-based albums.
+- `/my-listings/` is retained as a compatibility route, but authenticated users are redirected to `/collection/?view=card&my_listings=listed#browser`.
+- Listed inventory is treated as collection state, not a separate top-level area. Collection cards with active listings remain visible in the collection browser with a strong gray listed treatment and an over-image listed-count badge, and the collection sidebar includes a `My Listings` filter for listed-only inventory.
+- Frontend owned-inventory views intentionally exclude zero-quantity `InventoryItem` rows. Sold-out rows remain in the database so protected marketplace listing and purchase-history references stay intact, but they no longer appear as owned cards.
+- The collection page presents inventory as set-based albums.
   The view still receives flat backend-backed inventory/listing records, but
   `frontend.services.album_service` projects them into set books, selected-set
   pages, top filters, and pagination data for templates.
-- Catalog, marketplace listings, active listings, and collection pages now share a browser
+- Catalog, marketplace listings, and collection pages now share a browser
   projection with three visualizations: card album pages, set book covers, and
-  game shelves. Catalog, marketplace listings, and active listings default to
-  the card album view; collection defaults to set book covers.
+  game shelves. Catalog and marketplace listings default to the card album
+  view; collection defaults to set book covers.
 - Shared browser controls avoid carrying stale grouping filters into views where
   they are misleading: switching to set book covers clears the selected set,
   switching to shelves clears the selected game, and manually editing a sidebar
@@ -77,6 +79,9 @@ Current frontend UI boundary:
   essential counts/prices, and the primary action only.
 - Catalog card album slots bias more space toward the image: language and finish
   remain side by side, while value moves onto its own row below them.
+- Card image surfaces are navigational when the surrounding component has a
+  natural detail target. Catalog album images link to card detail pages, and
+  home latest-listing images link to listing detail pages.
 - Collection card view is intentionally different from listing/catalog card
   view: it renders sleeve-style album slots with only the large card image and
   short caption, so it feels like looking through a physical binder. The sell
@@ -85,6 +90,12 @@ Current frontend UI boundary:
   lists the authenticated owner's copies for the selected card and posts through
   `create_marketplace_listing_for_user`, preserving backend ownership and stock
   reservation rules.
+- Card detail also monitors active listings for owned copies in `Your Copies`,
+  so a seller can see which copies are already listed without leaving the card
+  workflow. Already-listed copies show monitoring state instead of another sell
+  form, while unlisted available copies can still be listed from the same
+  section. Buying remains in the active marketplace listings area on the same
+  card detail page.
 - The home search form submits to `/catalog/` with the `q` query parameter, so search uses the catalog filtering path.
 - `frontend/templates/components/kinetic_card.html` owns the reusable physical-card visual treatment. It renders only the card surface so existing page components can decide whether the card is linked, listed, or surrounded by metadata.
 - `frontend/static/js/kinetic-card.js` progressively enhances elements marked with `data-kinetic-card`; without JavaScript the card remains a normal image surface. The `data-kinetic-card` element is the stable pointer hitbox, while the nested `.kinetic-card__tilt` layer receives the 3D transform so corner pointer math does not reset when the card tilts.

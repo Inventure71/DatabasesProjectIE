@@ -83,6 +83,14 @@
             </div>
 
             <div class="filter-group">
+                <label class="filter-label">My Listings</label>
+                <select class="form-select" name="my_listings" onchange="this.form.submit()">
+                    <option value="">All owned cards</option>
+                    <option value="listed" {% if request.GET.my_listings == "listed" %}selected{% endif %}>Listed only</option>
+                </select>
+            </div>
+
+            <div class="filter-group">
                 <label class="filter-label">Rarity</label>
                 <div class="filter-checkboxes">
                     {% for rarity in rarities %}
@@ -121,7 +129,7 @@
         <div class="section__header">
             <h2 class="section__title">Owned Inventory Albums</h2>
             <div class="section__actions">
-                <a href="{% url 'my_listings' %}" class="section__link">View active listings →</a>
+                <a href="{% url 'collection' %}?view=card&my_listings=listed#browser" class="section__link">View listed cards →</a>
                 <a href="{% url 'catalog' %}" class="section__link">Find more cards →</a>
             </div>
         </div>

@@ -711,6 +711,7 @@ main {
     background: transparent;
     overflow: visible;
     perspective: 900px;
+    color: inherit;
 }
  
 .listing-card__image-placeholder {
@@ -735,9 +736,16 @@ main {
     font-family: 'Cinzel', serif;
     font-size: 0.85rem;
     font-weight: 600;
+    color: var(--text-primary);
     white-space: nowrap;
     overflow: hidden;
     text-overflow: ellipsis;
+}
+
+.listing-card__name:hover,
+.listing-card__name:focus-visible {
+    color: var(--gold);
+    outline: none;
 }
  
 .listing-card__price-row {
@@ -1362,6 +1370,35 @@ a.card-tile {
     font-size: 0.82rem;
 }
 
+.owned-copy-row__listings {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 6px;
+    margin-top: 8px;
+}
+
+.owned-copy-row__listings-title,
+.owned-copy-row__listing {
+    display: inline-flex;
+    align-items: center;
+    min-height: 24px;
+    border-radius: var(--radius-sm);
+    font-size: 0.72rem;
+    font-weight: 700;
+}
+
+.owned-copy-row__listings-title {
+    color: var(--text-muted);
+    text-transform: uppercase;
+}
+
+.owned-copy-row__listing {
+    padding: 3px 8px;
+    color: var(--text-primary);
+    background: rgba(160,158,152,0.12);
+    border: 1px solid rgba(160,158,152,0.25);
+}
+
 .owned-copy-row__form {
     display: grid;
     grid-template-columns: 76px 120px auto;
@@ -1372,6 +1409,21 @@ a.card-tile {
 .owned-copy-row__form .btn {
     min-height: 36px;
     justify-content: center;
+}
+
+.owned-copy-row__status {
+    justify-self: end;
+    align-self: center;
+    display: inline-flex;
+    align-items: center;
+    min-height: 36px;
+    padding: 0 12px;
+    color: var(--text-primary);
+    background: rgba(160,158,152,0.16);
+    border: 1px solid rgba(160,158,152,0.34);
+    border-radius: var(--radius-sm);
+    font-size: 0.78rem;
+    font-weight: 700;
 }
  
 /* ── LISTINGS TABLE ── */
@@ -2076,6 +2128,15 @@ a.card-tile {
     min-width: 0;
 }
 
+.album-card-slot__image-link {
+    color: inherit;
+}
+
+.album-card-slot__image-link:focus-visible {
+    outline: 1px solid var(--gold);
+    outline-offset: 4px;
+}
+
 .album-card-slot__body {
     display: flex;
     flex-direction: column;
@@ -2177,6 +2238,18 @@ a.card-tile {
     box-shadow: inset 0 0 0 1px rgba(255,255,255,0.03);
 }
 
+.album-card-slot--listed {
+    background:
+        linear-gradient(145deg, rgba(160,158,152,0.28), rgba(160,158,152,0.08)),
+        rgba(12,13,15,0.9);
+    border-color: rgba(160,158,152,0.55);
+}
+
+.album-card-slot--listed .kinetic-card {
+    filter: grayscale(0.82) saturate(0.42) brightness(0.68);
+    opacity: 0.78;
+}
+
 .album-card-sleeve {
     display: flex;
     flex-direction: column;
@@ -2190,6 +2263,35 @@ a.card-tile {
 .album-card-sleeve:focus-visible {
     color: var(--text-primary);
     outline: none;
+}
+
+.album-card-sleeve__image {
+    position: relative;
+    display: flex;
+    justify-content: center;
+    width: 100%;
+}
+
+.album-card-sleeve__badge {
+    position: absolute;
+    top: 8px;
+    left: 50%;
+    z-index: 2;
+    display: inline-flex;
+    max-width: calc(100% - 14px);
+    padding: 4px 8px;
+    color: var(--text-primary);
+    background: rgba(12,13,15,0.86);
+    border: 1px solid rgba(235,232,224,0.42);
+    border-radius: var(--radius-sm);
+    box-shadow: 0 8px 20px rgba(0,0,0,0.35);
+    font-size: 0.68rem;
+    font-weight: 800;
+    line-height: 1.2;
+    text-align: center;
+    text-transform: uppercase;
+    transform: translateX(-50%);
+    white-space: nowrap;
 }
 
 .album-card-sleeve__caption {

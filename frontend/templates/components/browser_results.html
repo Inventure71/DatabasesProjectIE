@@ -13,19 +13,26 @@
         {% if browser.page.items %}
             <div class="album-card-grid{% if browser.mode == 'collection' %} album-card-grid--sleeves{% endif %}">
                 {% for slot in browser.page.items %}
-                    <article class="album-card-slot{% if browser.mode == 'collection' %} album-card-slot--sleeve{% endif %}">
+                    <article class="album-card-slot{% if browser.mode == 'collection' %} album-card-slot--sleeve{% endif %}{% if browser.mode == 'collection' and slot.record.has_active_listings %} album-card-slot--listed{% endif %}">
                         {% if browser.mode == "collection" %}
                             <a href="{% url 'card_detail' slot.card.id %}" class="album-card-sleeve">
-                                {% include "components/kinetic_card.html" with card=slot.card kinetic_card_class="kinetic-card--album-sleeve" %}
+                                <span class="album-card-sleeve__image">
+                                    {% include "components/kinetic_card.html" with card=slot.card kinetic_card_class="kinetic-card--album-sleeve" %}
+                                    {% if slot.record.has_active_listings %}
+                                        <span class="album-card-sleeve__badge">
+                                            Listed · {{ slot.record.listed_quantity }} listed
+                                        </span>
+                                    {% endif %}
+                                </span>
                                 <span class="album-card-sleeve__caption">
                                     <span class="album-card-sleeve__name">{{ slot.card.name }}</span>
                                     <span class="album-card-sleeve__meta">{{ slot.card.set_name }} · {{ slot.record.condition_label }}</span>
                                 </span>
                             </a>
                         {% else %}
-                            <div class="album-card-slot__image">
+                            <a href="{% url 'card_detail' slot.card.id %}" class="album-card-slot__image album-card-slot__image-link" aria-label="View {{ slot.card.name }}">
                                 {% include "components/kinetic_card.html" with card=slot.card kinetic_card_class="kinetic-card--album" %}
-                            </div>
+                            </a>
 
                             <div class="album-card-slot__body">
                                 <a href="{% url 'card_detail' slot.card.id %}" class="album-card-slot__name">
