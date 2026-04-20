@@ -3,6 +3,7 @@ from decimal import Decimal
 from django.contrib.auth import get_user_model
 from django.core.files.uploadedfile import SimpleUploadedFile
 from django.db import connection
+from django.http import QueryDict
 from django.test import TestCase
 from django.test.utils import CaptureQueriesContext
 from django.urls import reverse
@@ -111,7 +112,7 @@ class FrontendBackendApiWiringTests(TestCase):
         self.assertContains(response, "Card")
         self.assertContains(response, "Collection Book Cover")
         self.assertContains(response, "Shelf")
-        self.assertContains(response, 'class="album-card-grid"')
+        self.assertContains(response, "album-card-grid")
         self.assertContains(response, "Album Page")
 
     def test_catalog_page_can_switch_to_set_books_and_game_shelves(self):
@@ -126,6 +127,62 @@ class FrontendBackendApiWiringTests(TestCase):
         self.assertEqual(shelf_response.status_code, 200)
         self.assertContains(shelf_response, 'class="game-shelf-grid"')
         self.assertContains(shelf_response, "Backend TCG")
+
+    def test_browser_view_links_reset_filters_that_conflict_with_target_view(self):
+        response = self.client.get(
+            reverse("catalog"),
+            {
+                "view": "card",
+                "game": "Backend TCG",
+                "set": "Backend Set",
+                "q": "Backend Dragon",
+            },
+        )
+
+        options = {
+            option["label"]: QueryDict(option["query"])
+            for option in response.context["browser"]["view_options"]
+        }
+
+        self.assertEqual(options["Collection Book Cover"].get("view"), "set")
+        self.assertIsNone(options["Collection Book Cover"].get("set"))
+        self.assertEqual(options["Collection Book Cover"].get("game"), "Backend TCG")
+
+        self.assertEqual(options["Shelf"].get("view"), "shelf")
+        self.assertIsNone(options["Shelf"].get("game"))
+        self.assertEqual(options["Shelf"].get("set"), "Backend Set")
+
+    def test_sidebar_search_inputs_switch_shared_browser_forms_to_card_view(self):
+        self.client.force_login(self.seller)
+        responses = [
+            self.client.get(reverse("catalog"), {"view": "shelf"}),
+            self.client.get(reverse("listings"), {"view": "shelf"}),
+            self.client.get(reverse("collection"), {"view": "shelf"}),
+            self.client.get(reverse("my_listings"), {"view": "shelf"}),
+        ]
+
+        for response in responses:
+            self.assertEqual(response.status_code, 200)
+            self.assertContains(response, 'name="view" value="shelf"')
+            self.assertContains(response, 'oninput="this.form.elements.view.value=\'card\'"')
+
+    def test_shared_browser_filter_and_view_navigation_targets_browser_anchor(self):
+        response = self.client.get(
+            reverse("catalog"),
+            {
+                "view": "set",
+                "game": "Backend TCG",
+                "set": "Backend Set",
+            },
+        )
+
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, 'id="browser"')
+        self.assertContains(response, 'action="/catalog/#browser"')
+        self.assertContains(response, 'href="/catalog/#browser"')
+        self.assertContains(response, 'href="?view=card&amp;game=Backend+TCG&amp;set=Backend+Set#browser"')
+        self.assertContains(response, 'href="?view=set&amp;game=Backend+TCG#browser"')
+        self.assertContains(response, 'href="?view=shelf&amp;set=Backend+Set#browser"')
 
     def test_catalog_page_paginates_card_results_in_database(self):
         for index in range(1, 13):
@@ -268,7 +325,7 @@ class FrontendBackendApiWiringTests(TestCase):
 
         self.assertEqual(response.status_code, 200)
         self.assertContains(response, 'class="browser-view-toggle"')
-        self.assertContains(response, 'class="album-card-grid"')
+        self.assertContains(response, "album-card-grid")
         self.assertContains(response, "Album Page")
         self.assertContains(response, 'name="set"')
         self.assertContains(response, 'name="language"')
@@ -340,7 +397,7 @@ class FrontendBackendApiWiringTests(TestCase):
 
         self.assertEqual(response.status_code, 200)
         self.assertContains(response, 'class="browser-view-toggle"')
-        self.assertContains(response, 'class="album-card-grid"')
+        self.assertContains(response, "album-card-grid")
         self.assertContains(response, "Album Page")
         self.assertContains(response, "Jungle")
         self.assertContains(response, 'name="q"')
@@ -348,6 +405,8 @@ class FrontendBackendApiWiringTests(TestCase):
         self.assertContains(response, 'name="language"')
         self.assertContains(response, "Jungle Cat")
         self.assertContains(response, "Backend Set")
+        self.assertContains(response, 'class="album-card-grid album-card-grid--sleeves"')
+        self.assertNotContains(response, 'class="collection-sell-form collection-sell-form--album"')
         self.assertContains(default_response, 'class="browser-view-toggle"')
         self.assertContains(default_response, 'class="collection-book-shelf"')
         self.assertContains(default_response, "Collection Book Cover")
@@ -381,18 +440,21 @@ class FrontendBackendApiWiringTests(TestCase):
         )
         self.client.force_login(self.seller)
 
-        response = self.client.get(reverse("my_listings"), {"set": "Jungle"})
+        response = self.client.get(reverse("my_listings"), {"view": "card", "set": "Jungle"})
+        default_response = self.client.get(reverse("my_listings"))
 
         self.assertEqual(response.status_code, 200)
-        self.assertContains(response, 'class="collection-book-shelf"')
-        self.assertContains(response, 'class="collection-book collection-book--active"')
-        self.assertContains(response, "Listing Book")
-        self.assertContains(response, 'class="album-filter-form"')
+        self.assertContains(response, 'class="browser-view-toggle"')
+        self.assertContains(response, 'class="album-card-grid"')
+        self.assertContains(response, "Album Page")
         self.assertContains(response, 'name="q"')
         self.assertContains(response, 'name="rarity"')
+        self.assertContains(response, 'name="language"')
         self.assertContains(response, "Jungle Cat")
         self.assertContains(response, "$18.00")
         self.assertNotContains(response, "$50.00")
+        self.assertContains(default_response, 'class="browser-view-toggle"')
+        self.assertContains(default_response, 'class="album-card-grid"')
 
     def test_card_detail_uses_real_backend_price_history_and_listings(self):
         response = self.client.get(reverse("card_detail", kwargs={"card_id": self.card.pk}))
@@ -401,6 +463,32 @@ class FrontendBackendApiWiringTests(TestCase):
         self.assertContains(response, "Backend Dragon")
         self.assertContains(response, "frontend-test")
         self.assertContains(response, "frontend-seller")
+
+    def test_card_detail_allows_owner_to_create_listing_from_owned_inventory(self):
+        self.client.force_login(self.seller)
+
+        response = self.client.get(reverse("card_detail", kwargs={"card_id": self.card.pk}))
+
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, "Your Copies")
+        self.assertContains(response, 'name="inventory_item_id"')
+        self.assertContains(response, "List Copy")
+
+        post_response = self.client.post(
+            reverse("card_detail", kwargs={"card_id": self.card.pk}),
+            {
+                "inventory_item_id": self.seller_inventory.id,
+                "quantity": "1",
+                "unit_price": "73.25",
+            },
+        )
+
+        listing = MarketListing.objects.filter(
+            seller=self.seller,
+            inventory_item=self.seller_inventory,
+            unit_price=Decimal("73.25"),
+        ).latest("id")
+        self.assertRedirects(post_response, f"{reverse('card_detail', kwargs={'card_id': self.card.pk})}?listed={listing.id}")
 
     def test_listing_detail_post_buys_through_backend_purchase_workflow(self):
         self.client.force_login(self.buyer)
@@ -486,7 +574,7 @@ class FrontendBackendApiWiringTests(TestCase):
         self.assertContains(response, "frontend-seller")
         self.assertContains(response, "127.50")
         self.assertContains(response, "Available")
-        self.assertContains(response, "Sell")
+        self.assertNotContains(response, "Sell")
 
     def test_collection_page_post_adds_new_physical_inventory_item_with_photo(self):
         self.client.force_login(self.buyer)

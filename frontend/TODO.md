@@ -15,12 +15,18 @@ This file tracks frontend work now that `frontend/` is a sibling Django app.
 - [x] Home featured cards and latest listings are limited in the database before rendering
 - [x] Listing detail buy form now uses the backend purchase workflow
 - [x] Authenticated users can view their collection, estimated value, owned quantities, available stock, and reserved stock
-- [x] Authenticated users can create sale listings from owned inventory through the collection page
+- [x] Authenticated users can create sale listings from owned inventory on the card detail page, after opening a card from the collection album
 - [x] Active listing cards use "Listed by" language so listed inventory is not confused with completed sales
 - [x] Authenticated sellers can view their active listings on a dedicated page
 - [x] Collection and active listing pages use set-based album books with selected-set pages, filters, and pagination.
 - [x] Catalog, marketplace listings, and collection share the same card/set/shelf browser system.
 - [x] Shared card album entries are compact enough for practical page-by-page scanning.
+- [x] Catalog album card entries use a larger card image and place value on its own row for easier scanning.
+- [x] My Listings now uses the shared card/set/shelf browser with the same left filters and defaults to card album view.
+- [x] My Collection card view renders as a sleeve-only album page; selling is no longer exposed inside collection album slots.
+- [x] Shared browser controls clear stale Set/Game filters when moving to book-cover or shelf views, and sidebar search input switches the shared browser back to card view.
+- [x] Shared browser filter, pagination, set-book, shelf, and visualization links target the browser results anchor so full-page GET refreshes return near the active browsing controls instead of the page top.
+- [x] Anchor navigation is instant instead of smooth so filter/view refreshes do not visibly glide down to the browser area.
 - [x] Authenticated backend API wrappers exist for user, inventory, order history, and collection valuation
 - [x] Login creates a Django session and the navbar logout form clears it through a CSRF-protected POST
 - [x] Reusable kinetic card visual component is shared by card image surfaces across the frontend
@@ -44,6 +50,7 @@ This file tracks frontend work now that `frontend/` is a sibling Django app.
 - [x] Add frontend page for authenticated active listing management visibility.
 - [x] Convert collection and active listing management surfaces from flat rows into set album views.
 - [x] Add shared visualization controls for card album, collection book cover, and game shelf views.
+- [x] Move the collection sell action from album cards to the opened card detail page.
 - [ ] Add purchase history and sales history pages for authenticated users.
 - [ ] Add authenticated user/profile display in the navbar or account page using the backend current-user endpoint.
 - [x] Replace mock-only price history with backend `PriceSnapshot` data.
@@ -53,5 +60,7 @@ This file tracks frontend work now that `frontend/` is a sibling Django app.
 - [x] Add regression tests for login session creation and navbar logout behavior.
 - [x] Replace existing catalog/listing/detail/collection card image surfaces with the reusable kinetic card component.
 - [x] Verified monthly home showcase and shared kinetic card rendering with focused frontend tests and browser checks.
-- [x] Verified frontend/backend wiring with `python manage.py test common.test_frontend_integration frontend`.
-- [x] Verified full project checks with `python manage.py check`, `python manage.py makemigrations --check --dry-run`, `python manage.py migrate --check`, and `python manage.py test common catalog users inventory marketplace pricing frontend`.
+- [x] Verified shared browser filter reset behavior with focused frontend regression tests.
+- [x] Verified shared browser anchor preservation with focused frontend regression tests.
+- [x] Verified current browser unification and card-detail listing regressions with focused frontend tests.
+- [ ] Restore the collection add-physical-inventory flow; current `python manage.py test --keepdb frontend` failures are the photo-backed add inventory tests.

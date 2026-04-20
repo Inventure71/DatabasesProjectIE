@@ -213,13 +213,13 @@ def _view_options(params, active_view):
         {
             "value": SET_VIEW,
             "label": "Collection Book Cover",
-            "query": _query_with(params, view=SET_VIEW, page=None),
+            "query": _query_with(params, view=SET_VIEW, set=None, page=None),
             "is_active": active_view == SET_VIEW,
         },
         {
             "value": SHELF_VIEW,
             "label": "Shelf",
-            "query": _query_with(params, view=SHELF_VIEW, page=None),
+            "query": _query_with(params, view=SHELF_VIEW, game=None, page=None),
             "is_active": active_view == SHELF_VIEW,
         },
     ]

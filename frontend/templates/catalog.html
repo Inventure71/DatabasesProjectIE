@@ -15,12 +15,12 @@
  
     <!-- SIDEBAR FILTERS -->
     <aside class="filter-sidebar">
-        <form method="GET" action="{% url 'catalog' %}" id="filter-form">
+        <form method="GET" action="{% url 'catalog' %}#browser" id="filter-form">
             <input type="hidden" name="view" value="{{ browser.view }}">
  
             <div class="filter-sidebar__header">
                 <span class="filter-sidebar__title">Filters</span>
-                <a href="{% url 'catalog' %}" class="filter-clear">Clear all</a>
+                <a href="{% url 'catalog' %}#browser" class="filter-clear">Clear all</a>
             </div>
  
             <!-- Search -->
@@ -33,6 +33,7 @@
                         name="q"
                         placeholder="Card name…"
                         value="{{ request.GET.q }}"
+                        oninput="this.form.elements.view.value='card'"
                     >
                 </div>
             </div>
@@ -125,7 +126,7 @@
     </aside>
  
     <!-- RESULTS AREA -->
-    <div class="catalog-results">
+    <div class="catalog-results" id="browser">
         {% include "components/browser_view_controls.html" %}
  
         <!-- Sort + count bar -->

@@ -35,131 +35,88 @@
     </div>
 </section>
 
-<section class="section collection-album">
-    <div class="section__header">
-        <h2 class="section__title">Listing Albums</h2>
-        <div class="section__actions">
-            <a href="{% url 'collection' %}" class="section__link">Back to collection →</a>
-            <a href="{% url 'listings' %}" class="section__link">Open marketplace →</a>
-        </div>
-    </div>
+<div class="catalog-layout collection-browser">
+    <aside class="filter-sidebar">
+        <form method="GET" action="{% url 'my_listings' %}#browser" id="my-listings-filter-form">
+            <input type="hidden" name="view" value="{{ browser.view }}">
 
-    {% if album.books %}
-        <div class="collection-book-shelf" aria-label="Listing set books">
-            {% for book in album.books %}
-                <a
-                    href="?{{ book.query }}"
-                    class="collection-book{% if book.is_active %} collection-book--active{% endif %}"
-                    aria-current="{% if book.is_active %}page{% else %}false{% endif %}"
-                >
-                    <span class="collection-book__cover">
-                        {% include "components/kinetic_card.html" with card=book.cover_card kinetic_card_class="kinetic-card--book" %}
-                    </span>
-                    <span class="collection-book__spine">
-                        <span class="collection-book__label">{{ book.set_name }}</span>
-                        <span class="collection-book__meta">{{ book.record_count }} listing{{ book.record_count|pluralize }} · {{ book.unit_count }} unit{{ book.unit_count|pluralize }}</span>
-                        <span class="collection-book__value">${{ book.total_value }}</span>
-                    </span>
-                </a>
-            {% endfor %}
-        </div>
-
-        <div class="album-page">
-            <div class="album-page__header">
-                <div>
-                    <span class="album-page__eyebrow">{{ album.selected_set }}</span>
-                    <h3 class="album-page__title">{{ album.title }}</h3>
-                </div>
-                <span class="album-page__count">
-                    Page {{ album.page.number }} of {{ album.page.num_pages }} · {{ album.page.count }} listing{{ album.page.count|pluralize }}
-                </span>
+            <div class="filter-sidebar__header">
+                <span class="filter-sidebar__title">Filters</span>
+                <a href="{% url 'my_listings' %}#browser" class="filter-clear">Clear all</a>
             </div>
 
-            <form class="album-filter-form" method="get" action="{% url 'my_listings' %}">
-                <input type="hidden" name="set" value="{{ album.selected_set }}">
+            <div class="filter-group">
+                <label class="filter-label">Search</label>
+                <input class="form-input form-input--sm" type="text" name="q" placeholder="Card name…" value="{{ request.GET.q }}" oninput="this.form.elements.view.value='card'">
+            </div>
 
-                <label class="album-filter-form__field">
-                    <span>Search</span>
-                    <input class="form-input form-input--sm" type="search" name="q" value="{{ album.filters.q }}" placeholder="Card name">
-                </label>
+            <div class="filter-group">
+                <label class="filter-label">Game</label>
+                <select class="form-select" name="game" onchange="this.form.submit()">
+                    <option value="">All Games</option>
+                    {% for game in games %}
+                        <option value="{{ game }}" {% if request.GET.game == game %}selected{% endif %}>{{ game }}</option>
+                    {% endfor %}
+                </select>
+            </div>
 
-                <label class="album-filter-form__field">
-                    <span>Rarity</span>
-                    <select class="form-input form-input--sm" name="rarity">
-                        <option value="">All rarities</option>
-                        {% for rarity in album.rarities %}
-                            <option value="{{ rarity }}" {% if album.filters.rarity == rarity %}selected{% endif %}>{{ rarity }}</option>
-                        {% endfor %}
-                    </select>
-                </label>
+            <div class="filter-group">
+                <label class="filter-label">Set</label>
+                <select class="form-select" name="set" onchange="this.form.submit()">
+                    <option value="">All Sets</option>
+                    {% for set in sets %}
+                        <option value="{{ set }}" {% if request.GET.set == set %}selected{% endif %}>{{ set }}</option>
+                    {% endfor %}
+                </select>
+            </div>
 
-                <button type="submit" class="btn btn-gold btn-sm">Filter</button>
-                <a href="?set={{ album.selected_set|urlencode }}" class="btn btn-ghost btn-sm">Reset</a>
-            </form>
-
-            {% if album.page.items %}
-                <div class="album-card-grid">
-                    {% for listing in album.page.items %}
-                        <article class="album-card-slot">
-                            <div class="album-card-slot__image">
-                                {% include "components/kinetic_card.html" with card=listing.card kinetic_card_class="kinetic-card--album" %}
-                            </div>
-
-                            <div class="album-card-slot__body">
-                                <a href="{% url 'listing_detail' listing.id %}" class="album-card-slot__name">
-                                    {{ listing.card.name }}
-                                </a>
-                                <div class="album-card-slot__meta">
-                                    <span class="rarity-badge rarity-badge--{{ listing.card.rarity|lower }}">{{ listing.card.rarity }}</span>
-                                    <span>{{ listing.condition }}</span>
-                                    <span>Listed by {{ listing.seller.username }}</span>
-                                </div>
-
-                                <dl class="album-card-slot__stats" aria-label="Listing counts">
-                                    <div>
-                                        <dt>Status</dt>
-                                        <dd>Listed</dd>
-                                    </div>
-                                    <div>
-                                        <dt>Available</dt>
-                                        <dd>{{ listing.quantity_available }}</dd>
-                                    </div>
-                                    <div>
-                                        <dt>Price</dt>
-                                        <dd>${{ listing.price_per_unit }}</dd>
-                                    </div>
-                                </dl>
-
-                                <a href="{% url 'listing_detail' listing.id %}" class="btn btn-outline-gold btn-sm album-card-slot__button">View Listing</a>
-                            </div>
-                        </article>
+            <div class="filter-group">
+                <label class="filter-label">Rarity</label>
+                <div class="filter-checkboxes">
+                    {% for rarity in rarities %}
+                        <label class="filter-checkbox">
+                            <input type="checkbox" name="rarity" value="{{ rarity }}" {% if rarity in selected_rarities %}checked{% endif %} onchange="this.form.submit()">
+                            <span class="rarity-badge rarity-badge--{{ rarity|lower }}">{{ rarity }}</span>
+                        </label>
                     {% endfor %}
                 </div>
+            </div>
 
-                {% if album.page.has_previous or album.page.has_next %}
-                    <nav class="pagination" aria-label="Listing book pages">
-                        {% if album.page.has_previous %}
-                            <a class="btn btn-ghost btn-sm" href="?{{ album.page.previous_query }}">Previous</a>
-                        {% endif %}
-                        <span class="pagination__status">Page {{ album.page.number }} of {{ album.page.num_pages }}</span>
-                        {% if album.page.has_next %}
-                            <a class="btn btn-ghost btn-sm" href="?{{ album.page.next_query }}">Next</a>
-                        {% endif %}
-                    </nav>
-                {% endif %}
-            {% else %}
-                <div class="empty-state">
-                    <p>No listings match these album filters.</p>
-                    <a href="?set={{ album.selected_set|urlencode }}" class="btn btn-outline-gold btn-sm" style="margin-top:16px">Clear filters</a>
+            <div class="filter-group">
+                <label class="filter-label">Language</label>
+                <select class="form-select" name="language" onchange="this.form.submit()">
+                    <option value="">All Languages</option>
+                    {% for lang in languages %}
+                        <option value="{{ lang }}" {% if request.GET.language == lang %}selected{% endif %}>{{ lang }}</option>
+                    {% endfor %}
+                </select>
+            </div>
+
+            <div class="filter-group">
+                <label class="filter-label">Price Range</label>
+                <div class="filter-price-row">
+                    <input class="form-input form-input--sm" type="number" name="min_price" placeholder="Min $" value="{{ request.GET.min_price }}" min="0">
+                    <span class="filter-price-sep">—</span>
+                    <input class="form-input form-input--sm" type="number" name="max_price" placeholder="Max $" value="{{ request.GET.max_price }}" min="0">
                 </div>
-            {% endif %}
+            </div>
+
+            <button type="submit" class="btn btn-gold" style="width:100%; justify-content:center;">Apply</button>
+        </form>
+    </aside>
+
+    <section class="catalog-results collection-album" id="browser">
+        <div class="section__header">
+            <h2 class="section__title">Listing Albums</h2>
+            <div class="section__actions">
+                <a href="{% url 'collection' %}" class="section__link">Back to collection →</a>
+                <a href="{% url 'listings' %}" class="section__link">Open marketplace →</a>
+            </div>
         </div>
-    {% else %}
-        <div class="empty-state">
-            <p>No active listings yet.</p>
-            <a href="{% url 'collection' %}" class="btn btn-outline-gold btn-sm" style="margin-top:16px">List a card</a>
-        </div>
-    {% endif %}
-</section>
+
+        {% include "components/browser_view_controls.html" %}
+        {% include "components/browser_results.html" %}
+    </section>
+</div>
 
 {% endblock %}

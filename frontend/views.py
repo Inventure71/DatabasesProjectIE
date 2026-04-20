@@ -95,6 +95,42 @@ def card_detail(request, card_id):
     if not card:
         return redirect("catalog")
 
+    sell_error = None
+    owned_inventory_items = []
+
+    if request.user.is_authenticated:
+        owned_inventory_items = [
+            item for item in list_my_inventory(request.user)
+            if item["card"]["id"] == card_id
+        ]
+
+    if request.method == "POST":
+        if not request.user.is_authenticated:
+            return redirect("login")
+
+        try:
+            inventory_item_id = int(request.POST.get("inventory_item_id", ""))
+            quantity = int(request.POST.get("quantity", ""))
+            unit_price = Decimal(request.POST.get("unit_price", ""))
+        except (TypeError, ValueError, InvalidOperation):
+            sell_error = "Enter a valid quantity and price."
+        else:
+            valid_inventory_ids = {item["id"] for item in owned_inventory_items}
+            if inventory_item_id not in valid_inventory_ids:
+                sell_error = "Choose one of your copies for this card."
+            else:
+                try:
+                    listing = create_marketplace_listing_for_user(
+                        user=request.user,
+                        inventory_item_id=inventory_item_id,
+                        quantity=quantity,
+                        unit_price=unit_price,
+                    )
+                except ValidationError as exc:
+                    sell_error = "; ".join(exc.messages)
+                else:
+                    return redirect(f"{reverse('card_detail', kwargs={'card_id': card_id})}?listed={listing['id']}")
+
     return render(
         request,
         "card_detail.html",
@@ -103,6 +139,9 @@ def card_detail(request, card_id):
             "active_listings": list_active_listings_for_card(card_id),
             "price_history": build_price_history(card),
             "similar_cards": list_similar_cards(card),
+            "owned_inventory_items": owned_inventory_items,
+            "sell_error": sell_error,
+            "listed_id": request.GET.get("listed"),
         },
     )
 
@@ -193,6 +232,7 @@ def collection(request):
 @login_required(login_url="login")
 def my_listings(request):
     active_listings = list_my_active_listings(request.user)
+    facets = get_card_facets()
     summary = {
         "active_count": len(active_listings),
         "available_quantity": sum(listing["quantity_available"] for listing in active_listings),
@@ -209,9 +249,14 @@ def my_listings(request):
                 active_listings,
                 request.GET,
                 mode="my_listings",
-                default_view=SET_VIEW,
+                default_view=CARD_VIEW,
             ),
             "summary": summary,
+            "games": facets["games"],
+            "sets": facets["sets"],
+            "rarities": facets["rarities"],
+            "languages": facets["languages"],
+            "selected_rarities": request.GET.getlist("rarity"),
         },
     )
 

@@ -41,7 +41,7 @@
 }
  
 html {
-    scroll-behavior: smooth;
+    scroll-behavior: auto;
 }
  
 body {
@@ -1134,6 +1134,10 @@ main {
     gap: 8px;
 }
 
+.catalog-results {
+    scroll-margin-top: 88px;
+}
+
 .browser-view-toggle {
     display: grid;
     grid-template-columns: repeat(3, minmax(0, 1fr));
@@ -1320,6 +1324,54 @@ a.card-tile {
     justify-content: center;
     padding: 13px;
     font-size: 0.95rem;
+}
+
+.owned-copy-list {
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+}
+
+.owned-copy-row {
+    display: grid;
+    grid-template-columns: minmax(180px, 1fr) minmax(320px, auto);
+    align-items: end;
+    gap: 16px;
+    padding: 14px 16px;
+    background: var(--bg-card);
+    border: 1px solid var(--border);
+    border-radius: var(--radius-sm);
+}
+
+.owned-copy-row__summary {
+    display: flex;
+    flex-direction: column;
+    gap: 3px;
+    min-width: 0;
+}
+
+.owned-copy-row__condition {
+    color: var(--text-primary);
+    font-family: 'Cinzel', serif;
+    font-size: 0.95rem;
+    font-weight: 700;
+}
+
+.owned-copy-row__meta {
+    color: var(--text-secondary);
+    font-size: 0.82rem;
+}
+
+.owned-copy-row__form {
+    display: grid;
+    grid-template-columns: 76px 120px auto;
+    align-items: end;
+    gap: 8px;
+}
+
+.owned-copy-row__form .btn {
+    min-height: 36px;
+    justify-content: center;
 }
  
 /* ── LISTINGS TABLE ── */
@@ -1907,7 +1959,11 @@ a.card-tile {
 }
 
 .kinetic-card--album {
-    width: min(78px, 100%);
+    width: min(124px, 100%);
+}
+
+.kinetic-card--album-sleeve {
+    width: min(156px, 100%);
 }
 
 .collection-book__spine {
@@ -1997,15 +2053,15 @@ a.card-tile {
 
 .album-card-grid {
     display: grid;
-    grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
-    gap: 8px;
+    grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+    gap: 10px;
 }
 
 .album-card-slot {
     display: grid;
-    grid-template-columns: 78px minmax(0, 1fr);
+    grid-template-columns: minmax(108px, 132px) minmax(0, 1fr);
     align-items: start;
-    gap: 10px;
+    gap: 14px;
     min-height: 0;
     padding: 10px;
     background: rgba(13,13,15,0.42);
@@ -2053,6 +2109,14 @@ a.card-tile {
     margin: 0;
 }
 
+.album-card-slot__stats--catalog {
+    grid-template-columns: repeat(2, minmax(42px, 1fr));
+}
+
+.album-card-slot__stat--value {
+    grid-column: 1 / -1;
+}
+
 .album-card-slot__stats div {
     min-width: 0;
 }
@@ -2095,6 +2159,64 @@ a.card-tile {
     justify-content: center;
     min-height: 32px;
     margin-top: 2px;
+}
+
+.album-card-grid--sleeves {
+    grid-template-columns: repeat(auto-fill, minmax(150px, 1fr));
+    gap: 14px;
+}
+
+.album-card-slot--sleeve {
+    display: block;
+    min-height: 0;
+    padding: 10px;
+    background:
+        linear-gradient(145deg, rgba(255,255,255,0.11), rgba(255,255,255,0.02)),
+        rgba(12,13,16,0.5);
+    border-color: rgba(255,255,255,0.12);
+    box-shadow: inset 0 0 0 1px rgba(255,255,255,0.03);
+}
+
+.album-card-sleeve {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 9px;
+    color: var(--text-primary);
+    text-align: center;
+}
+
+.album-card-sleeve:hover,
+.album-card-sleeve:focus-visible {
+    color: var(--text-primary);
+    outline: none;
+}
+
+.album-card-sleeve__caption {
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+    width: 100%;
+    min-width: 0;
+}
+
+.album-card-sleeve__name {
+    overflow: hidden;
+    font-family: 'Cinzel', serif;
+    font-size: 0.84rem;
+    font-weight: 700;
+    line-height: 1.2;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.album-card-sleeve__meta {
+    overflow: hidden;
+    color: var(--text-muted);
+    font-size: 0.7rem;
+    line-height: 1.2;
+    text-overflow: ellipsis;
+    white-space: nowrap;
 }
 
 .game-shelf-grid {
@@ -2206,6 +2328,15 @@ a.card-tile {
     .album-card-grid {
         grid-template-columns: 1fr;
     }
+    .album-card-grid--sleeves {
+        grid-template-columns: repeat(auto-fill, minmax(132px, 1fr));
+    }
+    .owned-copy-row {
+        grid-template-columns: 1fr;
+    }
+    .owned-copy-row__form {
+        grid-template-columns: 1fr 1fr auto;
+    }
     .listing-row {
         grid-template-columns: 60px 1fr auto;
         grid-template-rows: auto auto;
@@ -2235,15 +2366,24 @@ a.card-tile {
         grid-template-columns: 1fr;
     }
     .album-card-slot {
-        grid-template-columns: 70px minmax(0, 1fr);
+        grid-template-columns: 92px minmax(0, 1fr);
         gap: 8px;
         padding: 9px;
     }
     .kinetic-card--album {
-        width: 68px;
+        width: 86px;
+    }
+    .kinetic-card--album-sleeve {
+        width: min(138px, 100%);
     }
     .album-card-slot__stats {
         grid-template-columns: 1fr;
+    }
+    .owned-copy-row__form {
+        grid-template-columns: 1fr 1fr;
+    }
+    .owned-copy-row__form .btn {
+        grid-column: 1 / -1;
     }
     .listing-row {
         grid-template-columns: 56px 1fr;

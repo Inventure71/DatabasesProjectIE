@@ -49,17 +49,17 @@
 
 <div class="catalog-layout collection-browser">
     <aside class="filter-sidebar">
-        <form method="GET" action="{% url 'collection' %}" id="collection-filter-form">
+        <form method="GET" action="{% url 'collection' %}#browser" id="collection-filter-form">
             <input type="hidden" name="view" value="{{ browser.view }}">
 
             <div class="filter-sidebar__header">
                 <span class="filter-sidebar__title">Filters</span>
-                <a href="{% url 'collection' %}" class="filter-clear">Clear all</a>
+                <a href="{% url 'collection' %}#browser" class="filter-clear">Clear all</a>
             </div>
 
             <div class="filter-group">
                 <label class="filter-label">Search</label>
-                <input class="form-input form-input--sm" type="text" name="q" placeholder="Card name…" value="{{ request.GET.q }}">
+                <input class="form-input form-input--sm" type="text" name="q" placeholder="Card name…" value="{{ request.GET.q }}" oninput="this.form.elements.view.value='card'">
             </div>
 
             <div class="filter-group">
@@ -117,7 +117,7 @@
         </form>
     </aside>
 
-    <section class="catalog-results collection-album">
+    <section class="catalog-results collection-album" id="browser">
         <div class="section__header">
             <h2 class="section__title">Owned Inventory Albums</h2>
             <div class="section__actions">
