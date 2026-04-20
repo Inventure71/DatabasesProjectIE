@@ -1,9 +1,14 @@
 from decimal import Decimal
+from io import StringIO
 
 from django.contrib.auth import get_user_model
 from django.core.exceptions import ValidationError
+from django.core.management import call_command
 from django.db import IntegrityError, transaction
 from django.test import TestCase
+from django.urls import reverse
+from rest_framework import status
+from rest_framework.test import APITestCase
 
 from catalog.models import Card, CardGame, CardSet, CardVariant
 from inventory.models import InventoryHistory, InventoryItem
@@ -312,3 +317,158 @@ class InventoryServiceTests(TestCase):
         history = item.history_entries.get()
         self.assertEqual(history.change_type, InventoryHistory.ChangeType.PURCHASE)
         self.assertEqual(history.quantity_delta, 1)
+
+
+class InventoryApiTests(APITestCase):
+    @classmethod
+    def setUpTestData(cls):
+        call_command("seed_catalog", stdout=StringIO())
+
+    def setUp(self):
+        self.owner = get_user_model().objects.create_user(
+            username="collector-api",
+            password="test-password",
+        )
+        self.other_user = get_user_model().objects.create_user(
+            username="other-api",
+            password="test-password",
+        )
+        self.variant = CardVariant.objects.get(card__name="Charizard", language="en")
+
+    def test_anonymous_user_cannot_list_inventory(self):
+        response = self.client.get(reverse("inventory-my-list"))
+
+        self.assertEqual(response.status_code, status.HTTP_403_FORBIDDEN)
+
+    def test_list_returns_only_authenticated_user_inventory(self):
+        own_item = add_inventory_item(
+            owner=self.owner,
+            card_variant=self.variant,
+            condition=InventoryItem.Condition.NEAR_MINT,
+            quantity=2,
+        )
+        add_inventory_item(
+            owner=self.other_user,
+            card_variant=self.variant,
+            condition=InventoryItem.Condition.LIGHTLY_PLAYED,
+            quantity=1,
+        )
+        self.client.force_authenticate(user=self.owner)
+
+        response = self.client.get(reverse("inventory-my-list"))
+
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertEqual(len(response.data), 1)
+        self.assertEqual(response.data[0]["id"], own_item.id)
+        self.assertEqual(response.data[0]["card_variant"]["card"]["name"], "Charizard")
+        self.assertEqual(response.data[0]["available_quantity"], 2)
+
+    def test_add_inventory_endpoint_uses_service_and_writes_history(self):
+        self.client.force_authenticate(user=self.owner)
+
+        response = self.client.post(
+            reverse("inventory-my-add"),
+            {
+                "card_variant_id": self.variant.id,
+                "condition": InventoryItem.Condition.NEAR_MINT,
+                "quantity": 2,
+                "purchase_price": "100.00",
+            },
+            format="json",
+        )
+
+        self.assertEqual(response.status_code, status.HTTP_201_CREATED)
+        item = InventoryItem.objects.get(owner=self.owner, card_variant=self.variant)
+        self.assertEqual(item.quantity, 2)
+        history = item.history_entries.get()
+        self.assertEqual(history.change_type, InventoryHistory.ChangeType.ADD)
+        self.assertEqual(history.created_by, self.owner)
+
+    def test_update_endpoint_can_increase_reserve_and_release_stock(self):
+        item = add_inventory_item(
+            owner=self.owner,
+            card_variant=self.variant,
+            condition=InventoryItem.Condition.NEAR_MINT,
+            quantity=2,
+        )
+        self.client.force_authenticate(user=self.owner)
+
+        increase_response = self.client.post(
+            reverse("inventory-my-update", kwargs={"pk": item.pk}),
+            {"action": "INCREASE", "quantity": 3},
+            format="json",
+        )
+        reserve_response = self.client.post(
+            reverse("inventory-my-update", kwargs={"pk": item.pk}),
+            {"action": "RESERVE", "quantity": 4},
+            format="json",
+        )
+        release_response = self.client.post(
+            reverse("inventory-my-update", kwargs={"pk": item.pk}),
+            {"action": "RELEASE", "quantity": 1},
+            format="json",
+        )
+        item.refresh_from_db()
+
+        self.assertEqual(increase_response.status_code, status.HTTP_200_OK)
+        self.assertEqual(reserve_response.status_code, status.HTTP_200_OK)
+        self.assertEqual(release_response.status_code, status.HTTP_200_OK)
+        self.assertEqual(item.quantity, 5)
+        self.assertEqual(item.reserved_quantity, 3)
+        self.assertEqual(item.available_quantity, 2)
+
+    def test_remove_endpoint_reduces_available_stock_and_writes_history(self):
+        item = add_inventory_item(
+            owner=self.owner,
+            card_variant=self.variant,
+            condition=InventoryItem.Condition.NEAR_MINT,
+            quantity=4,
+        )
+        self.client.force_authenticate(user=self.owner)
+
+        response = self.client.post(
+            reverse("inventory-my-remove", kwargs={"pk": item.pk}),
+            {"quantity": 2},
+            format="json",
+        )
+        item.refresh_from_db()
+
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertEqual(item.quantity, 2)
+        latest_history = item.history_entries.order_by("-created_at").first()
+        self.assertEqual(latest_history.change_type, InventoryHistory.ChangeType.DECREASE)
+        self.assertEqual(latest_history.created_by, self.owner)
+
+    def test_user_cannot_update_another_users_inventory(self):
+        item = add_inventory_item(
+            owner=self.other_user,
+            card_variant=self.variant,
+            condition=InventoryItem.Condition.NEAR_MINT,
+            quantity=2,
+        )
+        self.client.force_authenticate(user=self.owner)
+
+        response = self.client.post(
+            reverse("inventory-my-update", kwargs={"pk": item.pk}),
+            {"action": "INCREASE", "quantity": 1},
+            format="json",
+        )
+
+        self.assertEqual(response.status_code, status.HTTP_404_NOT_FOUND)
+
+    def test_invalid_inventory_update_returns_bad_request(self):
+        item = add_inventory_item(
+            owner=self.owner,
+            card_variant=self.variant,
+            condition=InventoryItem.Condition.NEAR_MINT,
+            quantity=2,
+        )
+        self.client.force_authenticate(user=self.owner)
+
+        response = self.client.post(
+            reverse("inventory-my-update", kwargs={"pk": item.pk}),
+            {"action": "RESERVE", "quantity": 3},
+            format="json",
+        )
+
+        self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)

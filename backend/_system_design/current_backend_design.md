@@ -490,3 +490,153 @@ Reason:
 - `RELEASE`: reserved quantity released back to available stock.
 - `PURCHASE`: stock added to a buyer after purchase.
 - `ADJUST`: reserved for future manual corrections.
+
+## Inventory API
+
+The inventory API lets an authenticated user manage only their own inventory.
+
+Routes:
+
+- `GET /api/inventory/my/`
+- `POST /api/inventory/my/add/`
+- `POST /api/inventory/my/<id>/update/`
+- `POST /api/inventory/my/<id>/remove/`
+
+Authentication:
+
+- Every inventory API endpoint uses DRF `IsAuthenticated`.
+- Anonymous requests are rejected before inventory data is returned or changed.
+
+Ownership rule:
+
+- Inventory views query only rows where `owner=request.user`.
+- If a user requests another user's inventory item id, the API returns `404 Not Found`.
+- This avoids revealing whether another user's inventory row exists.
+
+### Response Serializer
+
+`InventoryItemSerializer` returns the owned row plus compact catalog data for the exact variant.
+
+Important response fields:
+
+- `id`
+- `card_variant`
+- `condition`
+- `quantity`
+- `reserved_quantity`
+- `available_quantity`
+- `is_for_sale`
+- `acquired_at`
+- `purchase_price`
+
+Nested variant data includes:
+
+- variant id
+- card id and card name
+- set id, set name, and set code
+- collector number
+- rarity
+- finish
+- language
+
+### `GET /api/inventory/my/`
+
+Lists inventory rows for the logged-in user.
+
+Implementation:
+
+- View: `inventory.views.MyInventoryListView`
+- Serializer: `inventory.serializers.InventoryItemSerializer`
+- Query behavior: filters by owner and uses `select_related("card_variant__card", "card_variant__set")`.
+
+### `POST /api/inventory/my/add/`
+
+Creates or merges inventory for the logged-in user.
+
+Expected request body:
+
+```json
+{
+  "card_variant_id": 1,
+  "condition": "NEAR_MINT",
+  "quantity": 2,
+  "purchase_price": "100.00"
+}
+```
+
+Implementation:
+
+- Request serializer: `inventory.serializers.AddInventoryItemSerializer`
+- Service: `inventory.services.add_inventory_item`
+
+Behavior:
+
+- If no matching owner, variant, and condition row exists, the service creates one.
+- If a matching row already exists, the service increases its quantity.
+- The service writes inventory history.
+
+### `POST /api/inventory/my/<id>/update/`
+
+Applies a stock action to one owned inventory row.
+
+Expected request body:
+
+```json
+{
+  "action": "RESERVE",
+  "quantity": 1
+}
+```
+
+Supported actions:
+
+- `INCREASE`
+- `DECREASE`
+- `RESERVE`
+- `RELEASE`
+
+Implementation:
+
+- Request serializer: `inventory.serializers.InventoryUpdateSerializer`
+- Services:
+  - `inventory.services.increase_quantity`
+  - `inventory.services.decrease_quantity`
+  - `inventory.services.reserve_quantity`
+  - `inventory.services.release_reserved_quantity`
+
+Behavior:
+
+- Serializer validation checks request shape and positive quantity.
+- Service validation checks business rules, such as not reserving more than available quantity.
+- Service validation failures return `400 Bad Request`.
+- Successful changes write inventory history.
+
+### `POST /api/inventory/my/<id>/remove/`
+
+Safely reduces available stock for one owned inventory row.
+
+Expected request body:
+
+```json
+{
+  "quantity": 1
+}
+```
+
+Implementation:
+
+- Request serializer: `inventory.serializers.RemoveInventoryQuantitySerializer`
+- Service: `inventory.services.decrease_quantity`
+
+Behavior:
+
+- The endpoint reduces quantity only through the service layer.
+- It rejects attempts to remove more than available stock.
+- It writes `DECREASE` history.
+- It does not delete the final inventory row yet.
+
+Why full row deletion is deferred:
+
+- `InventoryHistory` currently belongs to `InventoryItem`.
+- Deleting an `InventoryItem` would also delete its history because the foreign key uses cascade behavior.
+- We will revisit full deletion after marketplace/order history exists, because audit history should not disappear accidentally.

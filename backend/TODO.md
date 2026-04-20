@@ -425,17 +425,33 @@ What you should learn:
 - Validation at the serializer and service layers
 
 Steps:
-- [ ] Add endpoint to list the logged-in user inventory
-- [ ] Add endpoint to create inventory entries
-- [ ] Add endpoint to update inventory entries
-- [ ] Add endpoint to remove or reduce inventory safely
-- [ ] Ensure users cannot access or mutate another user inventory
-- [ ] Ensure endpoints call services instead of mutating models directly
+- [x] Add endpoint to list the logged-in user inventory
+- [x] Add endpoint to create inventory entries
+- [x] Add endpoint to update inventory entries
+- [x] Add endpoint to remove or reduce inventory safely
+- [x] Ensure users cannot access or mutate another user inventory
+- [x] Ensure endpoints call services instead of mutating models directly
 
 Verification:
-- [ ] Authenticated user can manage only their own inventory
-- [ ] Invalid requests return explicit errors
-- [ ] Inventory changes produce history records
+- [x] Authenticated user can manage only their own inventory
+- [x] Invalid requests return explicit errors
+- [x] Inventory changes produce history records
+
+Current status:
+- [x] Implemented `GET /api/inventory/my/`
+- [x] Implemented `POST /api/inventory/my/add/`
+- [x] Implemented `POST /api/inventory/my/<id>/update/`
+- [x] Implemented `POST /api/inventory/my/<id>/remove/`
+- [x] Added inventory serializers for list responses, add requests, update actions, and remove requests
+- [x] Inventory API endpoints require authentication with DRF `IsAuthenticated`
+- [x] Inventory API querysets are scoped to `owner=request.user`
+- [x] Requests for another user's inventory row return `404 Not Found`
+- [x] API views call inventory service functions instead of changing model fields directly
+- [x] Update endpoint supports `INCREASE`, `DECREASE`, `RESERVE`, and `RELEASE`
+- [x] Remove endpoint safely reduces available stock through `decrease_quantity`
+- [x] Full row deletion is intentionally deferred because `InventoryHistory` currently belongs to `InventoryItem`
+- [x] Verified on 2026-04-20 that inventory API tests first failed because routes were missing
+- [x] Verified on 2026-04-20 that `python manage.py test inventory`, `python manage.py test catalog`, `python manage.py test users`, `python manage.py test common`, `python manage.py check`, `python manage.py makemigrations --check --dry-run`, and `python manage.py migrate --check` pass after adding inventory API
 
 ## Phase 9: Marketplace Data Model
 
@@ -735,7 +751,7 @@ Strict order:
 - [x] Phase 5
 - [x] Phase 6
 - [x] Phase 7
-- [ ] Phase 8
+- [x] Phase 8
 - [ ] Phase 9
 - [ ] Phase 10
 - [ ] Phase 11
@@ -763,7 +779,7 @@ Immediate next steps:
 The backend MVP is done when all of the following are true:
 - [ ] Users can authenticate
 - [ ] Catalog data exists and is queryable
-- [ ] Users can manage inventory
+- [x] Users can manage inventory
 - [ ] Sellers can create listings from owned cards
 - [ ] Buyers can buy listed cards safely
 - [ ] Inventory updates remain consistent after purchase
