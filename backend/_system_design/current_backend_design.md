@@ -4,12 +4,39 @@ This file documents how the backend is currently structured. It should be update
 
 ## Foundation
 
-- Django project root: `backend/`
+- Django command entrypoint: repository-root `manage.py`
+- Backend source root: `backend/`
+- Frontend source root: `frontend/`
 - Django settings module: `config.settings`
 - Database: MySQL
 - API framework: Django REST Framework
 - Auth foundation: Django built-in auth
 - Shared infrastructure app: `common`
+
+The root `manage.py` prepends `backend/` to `sys.path`. That keeps backend
+apps importable as `common`, `catalog`, `inventory`, `users`, `marketplace`,
+and `pricing` while allowing `frontend/` to live as a sibling folder.
+
+## Frontend Integration Boundary
+
+The project is still one Django application at runtime, but ownership is split
+by folder:
+
+- `backend/` owns persistence, business rules, and real API endpoints.
+- `frontend/` owns templates, static assets, frontend views, and simulated
+  frontend data contracts.
+
+Routing convention:
+
+- `/` and page routes such as `/catalog/` are served by `frontend.urls`.
+- `/api/...` is reserved for real backend APIs.
+- `/mock-api/...` is reserved for frontend simulation endpoints used while the
+  real backend endpoint or model flow is not ready.
+
+The frontend should keep fake data behind service modules such as
+`frontend.services.catalog_service` and `frontend.services.listing_service`.
+When backend functionality is ready, replace the service internals with real
+queries or real API calls without changing templates first.
 
 ## Shared Infrastructure
 

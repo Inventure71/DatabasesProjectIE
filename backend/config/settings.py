@@ -49,6 +49,7 @@ INSTALLED_APPS = [
     'inventory',
     'marketplace',
     'pricing',
+    'frontend',
 ]
 
 

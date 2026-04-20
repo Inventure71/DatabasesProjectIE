@@ -1,0 +1,20 @@
+<a href="{% url 'card_detail' card.id %}" class="card-tile">
+ 
+    <div class="card-tile__image-wrap">
+        {% if card.image_url %}
+            <img src="{{ card.image_url }}" alt="{{ card.name }}">
+        {% else %}
+            <div class="card-tile__image-placeholder">🃏</div>
+        {% endif %}
+    </div>
+ 
+    <div class="card-tile__body">
+        <div class="card-tile__name">{{ card.name }}</div>
+        <div class="card-tile__set">{{ card.set_name }}</div>
+        <div class="card-tile__meta">
+            <span class="rarity-badge rarity-badge--{{ card.rarity|lower }}">{{ card.rarity }}</span>
+            <span class="card-tile__value">${{ card.current_value }}</span>
+        </div>
+    </div>
+ 
+</a>

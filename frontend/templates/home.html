@@ -1,0 +1,57 @@
+<!-- templates/home.html -->
+{% extends "base.html" %}
+{% load static %}
+
+{% block title %}Card Marketplace — Buy & Sell Trading Cards{% endblock %}
+
+{% block content %}
+
+<!-- HERO + SEARCH -->
+<section class="hero">
+    <span class="hero__eyebrow">The Trading Card Marketplace</span>
+    <h1 class="hero__title">Buy & Sell<br><span>Rare Cards</span></h1>
+    <p class="hero__subtitle">Discover thousands of cards, manage your collection, and trade with collectors worldwide.</p>
+
+    <form class="search-form" method="GET">
+        <input type="text" name="q" placeholder="Search by card name, set, rarity…" value="{{ request.GET.q }}">
+        <button type="submit" class="btn btn-gold">Search</button>
+    </form>
+</section>
+
+<!-- FEATURED CARDS -->
+<section class="section">
+    <div class="section__header">
+        <h2 class="section__title">Featured Cards</h2>
+        <a href="{% url 'catalog' %}" class="section__link">View all →</a>
+    </div>
+
+    <div class="card-grid">
+        {% for card in featured_cards %}
+            {% include "components/card_item.html" %}
+        {% empty %}
+            <div class="empty-state">
+                <p>No featured cards at the moment.</p>
+            </div>
+        {% endfor %}
+    </div>
+</section>
+
+<!-- LATEST LISTINGS -->
+<section class="section">
+    <div class="section__header">
+        <h2 class="section__title">Latest Listings</h2>
+        <a href="{% url 'listings' %}" class="section__link">Browse all →</a>
+    </div>
+
+    <div class="listing-grid">
+        {% for listing in latest_listings %}
+            {% include "components/listing_item.html" %}
+        {% empty %}
+            <div class="empty-state">
+                <p>No listings available right now.</p>
+            </div>
+        {% endfor %}
+    </div>
+</section>
+
+{% endblock %}

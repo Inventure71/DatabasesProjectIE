@@ -36,9 +36,6 @@ mysql -u root -p -e "CREATE DATABASE IF NOT EXISTS cards_marketplace CHARACTER S
 # Activate the virtual environment so Python uses this project's dependencies.
 source .venv/bin/activate
 
-# Move into the Django project directory where manage.py lives.
-cd backend
-
 # Validate Django configuration (apps, settings, database config, etc.).
 python manage.py check
 
@@ -49,13 +46,24 @@ python manage.py migrate
 python manage.py runserver
 ```
 
+The Django command entrypoint now lives at the repository root. Keep backend
+domain apps in `backend/` and frontend pages in `frontend/`.
+
+## Test
+
+From the repository root:
+
+```bash
+source .venv/bin/activate
+python manage.py test common catalog users inventory marketplace pricing
+```
+
 ## Seed Catalog Data
 
 After migrations have run, load the development catalog sample:
 
 ```bash
 source .venv/bin/activate
-cd backend
 python manage.py seed_catalog
 ```
 

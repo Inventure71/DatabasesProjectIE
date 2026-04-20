@@ -3,8 +3,10 @@
 This file is the step-by-step plan for building the backend together.
 
 Scope:
-- Backend only
-- Frontend ignored completely for now
+- Backend domain apps own data, business rules, persistence, and real APIs
+- Frontend lives as a sibling Django app at `frontend/`
+- Frontend simulation APIs live under `/mock-api/`
+- Real backend APIs live under `/api/`
 - Primary stack: Django + Django REST Framework + MySQL
 
 Working principles:
@@ -100,6 +102,9 @@ Verification:
 
 Current status:
 - [x] Verified on 2026-04-20 that `python manage.py check` passes with no issues
+- [x] Moved Django command entrypoint to repository-root `manage.py` so `backend/` and `frontend/` can be sibling folders
+- [x] Verified on 2026-04-20 that root `python manage.py check` passes with no issues
+- [x] Verified on 2026-04-20 that `python manage.py test common catalog users inventory marketplace pricing` runs 46 tests successfully
 - [x] Verified that Django apps exist under `backend/`
 - [x] Verified that `requirements.txt` includes Django, Django REST Framework, MySQL client, and python-dotenv
 - [x] Verified on 2026-04-20 that `.env` exists with the expected keys
@@ -740,6 +745,25 @@ Verification:
 - [ ] Similarity endpoint returns plausible results
 - [ ] Core backend still works unchanged
 
+## Frontend Integration Track
+
+Goal:
+- Let the frontend developer build pages in parallel without replacing backend structure.
+
+Current status:
+- [x] Imported the frontend Django app from `origin/Andres` without importing its separate `project/` backend layout
+- [x] Registered `frontend` in `INSTALLED_APPS`
+- [x] Mounted frontend pages at `/`
+- [x] Kept real backend endpoints under `/api/`
+- [x] Added frontend simulation endpoints under `/mock-api/`
+- [x] Moved frontend fake catalog/listing data behind `frontend/services/`
+- [x] Added integration tests for root `manage.py`, `/`, and `/mock-api/catalog/cards/`
+
+Next steps:
+- [ ] Replace one frontend service at a time with real backend queries once the matching backend module is complete
+- [ ] Keep unfinished simulated JSON endpoints under `/mock-api/`, never under `/api/`
+- [ ] Add frontend tests for each new page or mock API contract the frontend depends on
+
 ## Recommended Build Order
 
 Strict order:
@@ -790,7 +814,6 @@ The backend MVP is done when all of the following are true:
 ## Important Non-Goals For Now
 
 We are explicitly not prioritizing these right now:
-- [ ] Frontend integration
 - [ ] Payments
 - [ ] Shipping
 - [ ] Notifications

@@ -1,0 +1,161 @@
+{% extends "base.html" %}
+{% load static %}
+ 
+{% block title %}Catalog — Card Marketplace{% endblock %}
+ 
+{% block content %}
+ 
+<section class="page-header">
+    <h1 class="page-header__title">Card Catalog</h1>
+    <p class="page-header__subtitle">Browse {{ total_cards }} cards across all sets and games.</p>
+</section>
+ 
+<!-- SEARCH + FILTERS -->
+<div class="catalog-layout">
+ 
+    <!-- SIDEBAR FILTERS -->
+    <aside class="filter-sidebar">
+        <form method="GET" action="{% url 'catalog' %}" id="filter-form">
+ 
+            <div class="filter-sidebar__header">
+                <span class="filter-sidebar__title">Filters</span>
+                <a href="{% url 'catalog' %}" class="filter-clear">Clear all</a>
+            </div>
+ 
+            <!-- Search -->
+            <div class="filter-group">
+                <label class="filter-label">Search</label>
+                <div class="filter-search-wrap">
+                    <input
+                        class="form-input form-input--sm"
+                        type="text"
+                        name="q"
+                        placeholder="Card name…"
+                        value="{{ request.GET.q }}"
+                    >
+                </div>
+            </div>
+ 
+            <!-- Game -->
+            <div class="filter-group">
+                <label class="filter-label">Game</label>
+                <select class="form-select" name="game" onchange="this.form.submit()">
+                    <option value="">All Games</option>
+                    {% for game in games %}
+                        <option value="{{ game }}" {% if request.GET.game == game %}selected{% endif %}>
+                            {{ game }}
+                        </option>
+                    {% endfor %}
+                </select>
+            </div>
+ 
+            <!-- Set -->
+            <div class="filter-group">
+                <label class="filter-label">Set</label>
+                <select class="form-select" name="set" onchange="this.form.submit()">
+                    <option value="">All Sets</option>
+                    {% for set in sets %}
+                        <option value="{{ set }}" {% if request.GET.set == set %}selected{% endif %}>
+                            {{ set }}
+                        </option>
+                    {% endfor %}
+                </select>
+            </div>
+ 
+            <!-- Rarity -->
+            <div class="filter-group">
+                <label class="filter-label">Rarity</label>
+                <div class="filter-checkboxes">
+                    {% for rarity in rarities %}
+                        <label class="filter-checkbox">
+                            <input
+                                type="checkbox"
+                                name="rarity"
+                                value="{{ rarity }}"
+                                {% if rarity in selected_rarities %}checked{% endif %}
+                                onchange="this.form.submit()"
+                            >
+                            <span class="rarity-badge rarity-badge--{{ rarity|lower }}">{{ rarity }}</span>
+                        </label>
+                    {% endfor %}
+                </div>
+            </div>
+ 
+            <!-- Language -->
+            <div class="filter-group">
+                <label class="filter-label">Language</label>
+                <select class="form-select" name="language" onchange="this.form.submit()">
+                    <option value="">All Languages</option>
+                    {% for lang in languages %}
+                        <option value="{{ lang }}" {% if request.GET.language == lang %}selected{% endif %}>
+                            {{ lang }}
+                        </option>
+                    {% endfor %}
+                </select>
+            </div>
+ 
+            <!-- Price Range -->
+            <div class="filter-group">
+                <label class="filter-label">Price Range</label>
+                <div class="filter-price-row">
+                    <input
+                        class="form-input form-input--sm"
+                        type="number"
+                        name="min_price"
+                        placeholder="Min $"
+                        value="{{ request.GET.min_price }}"
+                        min="0"
+                    >
+                    <span class="filter-price-sep">—</span>
+                    <input
+                        class="form-input form-input--sm"
+                        type="number"
+                        name="max_price"
+                        placeholder="Max $"
+                        value="{{ request.GET.max_price }}"
+                        min="0"
+                    >
+                </div>
+            </div>
+ 
+            <button type="submit" class="btn btn-gold" style="width:100%; justify-content:center;">Apply</button>
+ 
+        </form>
+    </aside>
+ 
+    <!-- RESULTS AREA -->
+    <div class="catalog-results">
+ 
+        <!-- Sort + count bar -->
+        <div class="catalog-bar">
+            <span class="catalog-bar__count">
+                {% if cards %}{{ cards|length }} result{% if cards|length != 1 %}s{% endif %}{% else %}No results{% endif %}
+            </span>
+            <div class="catalog-bar__sort">
+                <label class="filter-label" style="margin:0">Sort by</label>
+                <select class="form-select form-select--sm" name="sort" form="filter-form" onchange="document.getElementById('filter-form').submit()">
+                    <option value="name"      {% if request.GET.sort == 'name' %}selected{% endif %}>Name</option>
+                    <option value="value_desc"{% if request.GET.sort == 'value_desc' %}selected{% endif %}>Value: High → Low</option>
+                    <option value="value_asc" {% if request.GET.sort == 'value_asc' %}selected{% endif %}>Value: Low → High</option>
+                    <option value="newest"    {% if request.GET.sort == 'newest' %}selected{% endif %}>Newest</option>
+                </select>
+            </div>
+        </div>
+ 
+        <!-- Card grid -->
+        <div class="card-grid">
+            {% for card in cards %}
+                {% include "components/card_item.html" %}
+            {% empty %}
+                <div class="empty-state">
+                    <p style="font-size:2rem">🔍</p>
+                    <p>No cards match your filters.</p>
+                    <a href="{% url 'catalog' %}" class="btn btn-outline-gold btn-sm" style="margin-top:16px">Clear filters</a>
+                </div>
+            {% endfor %}
+        </div>
+ 
+    </div>
+</div>
+ 
+{% endblock %}
