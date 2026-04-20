@@ -278,6 +278,11 @@ Fields:
 
 #### `card_image`
 
+Relationship:
+
+* `card_variant_id` is a one-to-one reference to `card_variant.id`
+* each card variant can have at most one image
+
 Fields:
 
 * id
@@ -286,7 +291,6 @@ Fields:
 * image_hash
 * width
 * height
-* is_primary
 * created_at
 * updated_at
 
@@ -331,10 +335,14 @@ Fields:
 * inventory_item_id
 * change_type
 * quantity_delta
-* related_listing_id
-* related_order_id
 * created_by_id
+* note
 * created_at
+
+Later marketplace migration:
+
+* add nullable `related_listing_id` after `market_listing` exists
+* add nullable `related_order_id` after `purchase_order` exists
 
 ### 5.4 Marketplace tables
 
@@ -404,16 +412,19 @@ Catalog references:
 * `card.game_id` -> `card_game.id`
 * `card_variant.card_id` -> `card.id`
 * `card_variant.set_id` -> `card_set.id`
-* `card_image.card_variant_id` -> `card_variant.id`
+* `card_image.card_variant_id` -> `card_variant.id`, one-to-one
 
 Ownership references:
 
 * `inventory_item.owner_id` -> Django user table
 * `inventory_item.card_variant_id` -> `card_variant.id`
 * `inventory_history.inventory_item_id` -> `inventory_item.id`
+* `inventory_history.created_by_id` -> Django user table
+
+Later marketplace references:
+
 * `inventory_history.related_listing_id` -> `market_listing.id`, nullable
 * `inventory_history.related_order_id` -> `purchase_order.id`, nullable
-* `inventory_history.created_by_id` -> Django user table
 
 Marketplace references:
 

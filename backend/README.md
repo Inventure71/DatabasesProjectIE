@@ -48,3 +48,15 @@ python manage.py migrate
 # Start the local Django development server (usually at http://127.0.0.1:8000).
 python manage.py runserver
 ```
+
+## Seed Catalog Data
+
+After migrations have run, load the development catalog sample:
+
+```bash
+source .venv/bin/activate
+cd backend
+python manage.py seed_catalog
+```
+
+The command is repeatable. Running it again updates the same sample rows instead of duplicating them.

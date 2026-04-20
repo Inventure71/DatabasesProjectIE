@@ -24,19 +24,19 @@ What you should learn:
 - What belongs in models, services, serializers, and views
 
 Steps:
-- [ ] Confirm the backend stack:
+- [x] Confirm the backend stack:
   - Django
   - Django REST Framework
   - MySQL
   - Django built-in auth
-- [ ] Confirm the backend apps:
+- [x] Confirm the backend apps:
   - `users`
   - `catalog`
   - `inventory`
   - `marketplace`
   - `pricing`
   - `similarity` as optional later phase
-- [ ] Confirm the MVP boundary:
+- [x] Confirm the MVP boundary:
   - Catalog management
   - User inventory
   - Listings
@@ -50,6 +50,12 @@ Steps:
 
 Exit criteria:
 - We agree on module boundaries and MVP scope
+
+Current status:
+- [x] Confirmed backend stack and implemented project foundation with Django, Django REST Framework, MySQL, and Django built-in auth
+- [x] Confirmed backend app boundaries: `common`, `users`, `catalog`, `inventory`, `marketplace`, and `pricing`
+- [x] Confirmed similarity is optional later work and not part of the first transactional marketplace slice
+- [ ] Reserved quantity behavior still needs a precise rule before listing services are implemented
 
 ## Phase 1: Backend Foundation
 
@@ -168,7 +174,7 @@ Steps:
 - [x] Add a basic authenticated endpoint to confirm user access works
 
 Verification:
-- [ ] Can create users from admin
+- [x] Can create users from admin
 - [x] Can create and view profiles
 - [x] Authenticated endpoint rejects anonymous access and accepts logged-in users
 
@@ -189,6 +195,7 @@ Current status:
 - [x] Verified on 2026-04-20 that anonymous requests to `users-me` are rejected
 - [x] Verified on 2026-04-20 that authenticated requests to `users-me` return user and profile data
 - [x] Verified on 2026-04-20 that `python manage.py test users`, `python manage.py test common`, `python manage.py check`, and `python manage.py makemigrations --check --dry-run` pass after adding the endpoint
+- [x] Verified on 2026-04-20 that Django admin has both built-in `User` and `UserProfile` registered
 
 ## Phase 4: Catalog Data Model
 
@@ -201,39 +208,65 @@ What you should learn:
 - Why catalog data must exist before inventory or listings
 
 Steps:
-- [ ] Create the `catalog` app
-- [ ] Create the `card_game` model
-- [ ] Create the `card_set` model
-- [ ] Create the `card` model
-- [ ] Create the `card_variant` model
-- [ ] Create the `card_image` model
-- [ ] Add field constraints and validation rules
-- [ ] Add indexes for search and filtering
-- [ ] Create and run migrations
-- [ ] Register catalog models in admin
-- [ ] Seed a small but coherent sample catalog dataset
+- [x] Create the `catalog` app
+- [x] Create the `card_game` model
+- [x] Create the `card_set` model
+- [x] Create the `card` model
+- [x] Create the `card_variant` model
+- [x] Create the `card_image` model
+- [x] Add field constraints and validation rules
+- [x] Add indexes for search and filtering
+- [x] Create and run migrations
+- [x] Register catalog models in admin
+- [x] Seed a small but coherent sample catalog dataset
 
 Substeps for model review:
-- [ ] Confirm each relationship direction is correct
-- [ ] Confirm catalog foreign keys:
+- [x] Confirm each relationship direction is correct
+- [x] Confirm catalog foreign keys:
   - `CardSet.game_id` references `CardGame.id`
   - `Card.game_id` references `CardGame.id`
   - `CardVariant.card_id` references `Card.id`
   - `CardVariant.set_id` references `CardSet.id`
   - `CardImage.card_variant_id` references `CardVariant.id`
-- [ ] Confirm nullable fields are justified
-- [ ] Confirm uniqueness rules where needed:
+- [x] Confirm nullable fields are justified
+- [x] Confirm uniqueness rules where needed:
   - set code
   - collector number within the right scope
-  - one primary image rule if enforced
-- [ ] Confirm the conceptual split:
+  - one image per card variant is enforced with `CardImage.card_variant` as `OneToOneField`
+- [x] Confirm the conceptual split:
   - `Card` stores stable card identity, text, and stats
   - `CardVariant` stores set-specific, print-specific, language-specific, and market-specific data
 
 Verification:
-- [ ] Catalog migrations apply cleanly
-- [ ] Admin can browse games, sets, cards, variants, and images
-- [ ] Seeded data produces valid relations
+- [x] Catalog migrations apply cleanly
+- [x] Admin can browse games, sets, cards, variants, and images
+- [x] Seeded data produces valid relations
+
+Current status:
+- [x] Implemented catalog models: `CardGame`, `CardSet`, `Card`, `CardVariant`, and `CardImage`
+- [x] Verified that the `catalog` app exists and is included in project structure
+- [x] Implemented catalog foreign-key chain from game/set/card to variant and variant images
+- [x] Implemented `CardVariant.Rarity` and `CardVariant.Finish` using Django `TextChoices`
+- [x] Implemented indexes for card name, card game/name, variant set/rarity, and variant current value
+- [x] Implemented uniqueness for set code per game and variant printing identity
+- [x] Implemented non-negative `CardVariant.current_value` database constraint
+- [x] Registered catalog models in Django admin
+- [x] Created and applied `catalog.0001_initial`
+- [x] Verified on 2026-04-20 that `python manage.py test catalog`, `python manage.py test users`, `python manage.py test common`, `python manage.py check`, and `python manage.py makemigrations --check --dry-run` pass
+- [x] Verified on 2026-04-20 that `catalog.0001_initial` is applied in the development database
+- [x] Verified on 2026-04-20 that all catalog models are registered in Django admin
+- [x] Decided on 2026-04-20 that each `CardVariant` should have at most one `CardImage`
+- [x] Enforced one `CardImage` per `CardVariant` with `OneToOneField`
+- [x] Created and applied `catalog.0002_alter_cardimage_options_alter_cardimage_card_variant`
+- [x] Removed redundant `CardImage.is_primary` field because only one image can exist per variant
+- [x] Created and applied `catalog.0003_remove_cardimage_is_primary`
+- [x] Verified on 2026-04-20 that creating a duplicate `CardImage` for the same `CardVariant` raises `IntegrityError`
+- [x] Verified on 2026-04-20 that `python manage.py test catalog`, `python manage.py test users`, `python manage.py test common`, `python manage.py check`, `python manage.py makemigrations --check --dry-run`, and `python manage.py migrate --check` pass after enforcing the rule
+- [x] Implemented repeatable `seed_catalog` management command
+- [x] Seed command creates 1 game, 1 set, 2 cards, 3 variants, and 3 images
+- [x] Verified on 2026-04-20 that running `python manage.py seed_catalog` twice does not duplicate catalog rows
+- [x] Verified on 2026-04-20 that seeded variants reference the expected game, set, cards, and one-to-one images
+- [x] Verified on 2026-04-20 that the development database has 1 game, 1 set, 2 cards, 3 variants, and 3 images after seeding
 
 ## Phase 5: Catalog Read API
 
@@ -246,23 +279,35 @@ What you should learn:
 - Why read APIs should be stable and explicit
 
 Steps:
-- [ ] Add serializers for catalog models
-- [ ] Add list endpoint for cards
-- [ ] Add detail endpoint for a card
-- [ ] Add detail endpoint for a variant
-- [ ] Add list endpoint for sets
-- [ ] Add filtering for:
+- [x] Add serializers for catalog models
+- [x] Add list endpoint for cards
+- [x] Add detail endpoint for a card
+- [x] Add detail endpoint for a variant
+- [x] Add list endpoint for sets
+- [x] Add filtering for:
   - name
   - game
   - set
   - rarity
-- [ ] Add ordering where useful
-- [ ] Avoid N+1 query problems with `select_related` and `prefetch_related`
+- [x] Add ordering where useful
+- [x] Avoid N+1 query problems with `select_related` and `prefetch_related`
 
 Verification:
-- [ ] Endpoints return correct JSON shape
-- [ ] Filters behave correctly
-- [ ] Query count stays reasonable for common requests
+- [x] Endpoints return correct JSON shape
+- [x] Filters behave correctly
+- [x] Query count stays reasonable for common requests
+
+Current status:
+- [x] Implemented catalog serializers for games, sets, cards, variants, and images
+- [x] Implemented `GET /api/catalog/cards/`
+- [x] Implemented `GET /api/catalog/cards/<id>/`
+- [x] Implemented `GET /api/catalog/variants/<id>/`
+- [x] Implemented `GET /api/catalog/sets/`
+- [x] Implemented card filters for `name`, `game`, `set`, and `rarity`
+- [x] Ordered card list by card name and set list by game/name
+- [x] Used `select_related` and `prefetch_related` for catalog read queries
+- [x] Verified on 2026-04-20 that new API tests first failed because catalog routes were missing
+- [x] Verified on 2026-04-20 that `python manage.py test catalog`, `python manage.py test users`, `python manage.py test common`, `python manage.py check`, `python manage.py makemigrations --check --dry-run`, and `python manage.py migrate --check` pass after adding catalog read API
 
 ## Phase 6: Inventory Data Model
 
@@ -275,17 +320,18 @@ What you should learn:
 - Why inventory history matters in transactional systems
 
 Steps:
-- [ ] Create the `inventory` app
-- [ ] Create the `inventory_item` model
-- [ ] Create the `inventory_history` model
-- [ ] Add inventory foreign keys:
+- [x] Create the `inventory` app
+- [x] Create the `inventory_item` model
+- [x] Create the `inventory_history` model
+- [x] Add inventory foreign keys:
   - `InventoryItem.owner_id` references the Django user table
   - `InventoryItem.card_variant_id` references `CardVariant.id`
   - `InventoryHistory.inventory_item_id` references `InventoryItem.id`
-  - `InventoryHistory.related_listing_id` optionally references `MarketListing.id`
-  - `InventoryHistory.related_order_id` optionally references `PurchaseOrder.id`
   - `InventoryHistory.created_by_id` references the Django user table
-- [ ] Add inventory fields:
+- [x] Defer marketplace-related inventory history foreign keys until marketplace models exist:
+  - `InventoryHistory.related_listing_id` should reference `MarketListing.id` after marketplace models exist
+  - `InventoryHistory.related_order_id` should reference `PurchaseOrder.id` after marketplace models exist
+- [x] Add inventory fields:
   - owner
   - card variant
   - condition
@@ -294,18 +340,39 @@ Steps:
   - is for sale
   - acquired at
   - purchase price
-- [ ] Define hard rules:
+- [x] Define hard rules:
   - quantity must be greater than 0
   - reserved quantity cannot be negative
   - reserved quantity cannot exceed quantity
-- [ ] Decide whether the same owner can have multiple rows for the same variant and condition
-- [ ] Add indexes for owner and variant lookups
-- [ ] Register models in admin
+- [x] Decide whether the same owner can have multiple rows for the same variant and condition
+- [x] Add indexes for owner and variant lookups
+- [x] Register models in admin
 
 Verification:
-- [ ] Invalid inventory states are blocked
-- [ ] Inventory rows can be created and inspected cleanly
-- [ ] Inventory references exact `CardVariant` rows, not abstract `Card` rows
+- [x] Invalid inventory states are blocked
+- [x] Inventory rows can be created and inspected cleanly
+- [x] Inventory references exact `CardVariant` rows, not abstract `Card` rows
+
+Current status:
+- [x] Implemented `InventoryItem`
+- [x] Implemented `InventoryHistory`
+- [x] `InventoryItem.owner` references the Django user table
+- [x] `InventoryItem.card_variant` references `CardVariant`
+- [x] `InventoryHistory.inventory_item` references `InventoryItem`
+- [x] `InventoryHistory.created_by` references the Django user table and allows null when the actor is deleted
+- [x] Enforced one row per owner, card variant, and condition
+- [x] Enforced positive quantity
+- [x] Enforced non-negative reserved quantity
+- [x] Enforced reserved quantity not above total quantity
+- [x] Enforced non-negative purchase price when purchase price is present
+- [x] Added `available_quantity` property as `quantity - reserved_quantity`
+- [x] Added indexes for owner/variant, owner/sale state, inventory history by item/date, and inventory history by actor/date
+- [x] Registered `InventoryItem` and `InventoryHistory` in Django admin
+- [x] Created and applied `inventory.0001_initial`
+- [x] Verified on 2026-04-20 that inventory tests first failed because inventory models/tables did not exist
+- [x] Verified on 2026-04-20 that `python manage.py test inventory`, `python manage.py test catalog`, `python manage.py test users`, `python manage.py test common`, `python manage.py check`, `python manage.py makemigrations --check --dry-run`, and `python manage.py migrate --check` pass
+- [x] Verified on 2026-04-20 that `inventory.0001_initial` is applied
+- [x] Verified on 2026-04-20 that inventory models are registered in Django admin
 
 ## Phase 7: Inventory Services
 
@@ -317,22 +384,36 @@ What you should learn:
 - Why state changes should have one trusted entry point
 
 Steps:
-- [ ] Create inventory service functions for:
+- [x] Create inventory service functions for:
   - add inventory item
   - increase quantity
   - decrease quantity
   - reserve quantity
   - release reserved quantity
   - merge purchased items into buyer inventory
-- [ ] Make each service write `inventory_history`
-- [ ] Decide what each history `change_type` means
-- [ ] Make services validate business rules before saving
-- [ ] Keep services reusable by both API endpoints and future admin actions
+- [x] Make each service write `inventory_history`
+- [x] Decide what each history `change_type` means
+- [x] Make services validate business rules before saving
+- [x] Keep services reusable by both API endpoints and future admin actions
 
 Verification:
-- [ ] Service tests cover normal updates
-- [ ] Service tests cover invalid updates
-- [ ] History rows are written consistently
+- [x] Service tests cover normal updates
+- [x] Service tests cover invalid updates
+- [x] History rows are written consistently
+
+Current status:
+- [x] Implemented `add_inventory_item`
+- [x] Implemented `increase_quantity`
+- [x] Implemented `decrease_quantity`
+- [x] Implemented `reserve_quantity`
+- [x] Implemented `release_reserved_quantity`
+- [x] Implemented `merge_purchased_item`
+- [x] Each service uses a database transaction
+- [x] Services that modify existing inventory lock rows with `select_for_update`
+- [x] Each successful service call writes an `InventoryHistory` row
+- [x] Invalid service inputs raise `ValidationError`
+- [x] Verified on 2026-04-20 that service tests first failed because inventory service functions did not exist
+- [x] Verified on 2026-04-20 that `python manage.py test inventory`, `python manage.py test catalog`, `python manage.py test users`, `python manage.py test common`, `python manage.py check`, `python manage.py makemigrations --check --dry-run`, and `python manage.py migrate --check` pass after adding inventory services
 
 ## Phase 8: Inventory API
 
@@ -649,11 +730,11 @@ Strict order:
 - [ ] Phase 0
 - [x] Phase 1
 - [x] Phase 2
-- [ ] Phase 3
-- [ ] Phase 4
-- [ ] Phase 5
-- [ ] Phase 6
-- [ ] Phase 7
+- [x] Phase 3
+- [x] Phase 4
+- [x] Phase 5
+- [x] Phase 6
+- [x] Phase 7
 - [ ] Phase 8
 - [ ] Phase 9
 - [ ] Phase 10
