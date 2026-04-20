@@ -25,7 +25,11 @@
                             <div class="album-card-slot__meta">
                                 <span class="rarity-badge rarity-badge--{{ slot.card.rarity|lower }}">{{ slot.card.rarity }}</span>
                                 <span>{{ slot.card.set_name }}</span>
-                                <span>{{ slot.card.game }}</span>
+                                {% if browser.mode == "collection" %}
+                                    <span>{{ slot.record.condition_label }}</span>
+                                {% elif browser.mode == "listings" or browser.mode == "my_listings" %}
+                                    <span>{{ slot.record.condition|default:"Near Mint" }}</span>
+                                {% endif %}
                             </div>
 
                             {% if browser.mode == "catalog" %}
@@ -65,9 +69,6 @@
                                     <a href="{% url 'login' %}" class="btn btn-outline-gold btn-sm album-card-slot__button">Login to Buy</a>
                                 {% endif %}
                             {% elif browser.mode == "collection" %}
-                                <div class="album-card-slot__meta">
-                                    <span>{{ slot.record.condition_label }}</span>
-                                </div>
                                 <dl class="album-card-slot__stats" aria-label="Inventory counts">
                                     <div>
                                         <dt>Owned</dt>

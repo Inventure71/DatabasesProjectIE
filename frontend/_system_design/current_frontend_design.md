@@ -62,6 +62,9 @@ Current frontend UI boundary:
   `frontend/templates/components/browser_results.html`. Page templates keep
   their own filters and page-specific actions, but the result layouts come from
   these shared components.
+- Card album entries are intentionally compact: each slot keeps the card image,
+  name, rarity, set, one page-specific metadata line, essential counts/prices,
+  and the primary action only.
 - Album templates preserve backend workflows: collection slots still post
   inventory item id, quantity, and price into the listing-creation path, while
   listing slots link to the existing listing detail page.

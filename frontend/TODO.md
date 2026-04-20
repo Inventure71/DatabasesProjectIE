@@ -20,6 +20,7 @@ This file tracks frontend work now that `frontend/` is a sibling Django app.
 - [x] Authenticated sellers can view their active listings on a dedicated page
 - [x] Collection and active listing pages use set-based album books with selected-set pages, filters, and pagination.
 - [x] Catalog, marketplace listings, and collection share the same card/set/shelf browser system.
+- [x] Shared card album entries are compact enough for practical page-by-page scanning.
 - [x] Authenticated backend API wrappers exist for user, inventory, order history, and collection valuation
 - [x] Login creates a Django session and the navbar logout form clears it through a CSRF-protected POST
 - [x] Reusable kinetic card visual component is shared by card image surfaces across the frontend
