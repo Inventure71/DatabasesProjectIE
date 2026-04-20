@@ -92,7 +92,7 @@
                         <td class="listings-table__price">${{ listing.price_per_unit }}</td>
                         <td>
                             {% if user.is_authenticated %}
-                                <a href="#" class="btn btn-gold btn-sm">Buy</a>
+                                <a href="{% url 'listing_detail' listing.id %}" class="btn btn-gold btn-sm">Buy</a>
                             {% else %}
                                 <a href="{% url 'login' %}" class="btn btn-outline-gold btn-sm">Login</a>
                             {% endif %}

@@ -1,7 +1,10 @@
 from pathlib import Path
+from decimal import Decimal
 
 from django.conf import settings
-from django.test import SimpleTestCase
+from django.test import SimpleTestCase, TestCase
+
+from catalog.models import Card, CardGame, CardSet, CardVariant
 
 
 class ProjectLayoutTests(SimpleTestCase):
@@ -12,13 +15,27 @@ class ProjectLayoutTests(SimpleTestCase):
         self.assertFalse((Path(settings.BASE_DIR) / "manage.py").exists())
 
 
-class FrontendIntegrationTests(SimpleTestCase):
+class FrontendIntegrationTests(TestCase):
+    @classmethod
+    def setUpTestData(cls):
+        game = CardGame.objects.create(name="Frontend Integration", slug="frontend-integration")
+        card_set = CardSet.objects.create(game=game, name="Integration Set", code="INT")
+        card = Card.objects.create(game=game, name="Integration Dragon")
+        CardVariant.objects.create(
+            card=card,
+            set=card_set,
+            collector_number="1/1",
+            rarity=CardVariant.Rarity.RARE,
+            current_value=Decimal("10.00"),
+        )
+
     def test_home_page_is_served_by_frontend_app(self):
         response = self.client.get("/")
 
         self.assertEqual(response.status_code, 200)
+        self.assertContains(response, "Integration Dragon")
 
-    def test_mock_catalog_cards_endpoint_returns_frontend_simulation_data(self):
+    def test_mock_catalog_cards_endpoint_returns_frontend_service_data(self):
         response = self.client.get("/mock-api/catalog/cards/")
 
         self.assertEqual(response.status_code, 200)

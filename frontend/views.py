@@ -1,7 +1,9 @@
 from django.contrib.auth import login, logout
 from django.contrib.auth.forms import AuthenticationForm, UserCreationForm
+from django.core.exceptions import ValidationError
 from django.shortcuts import redirect, render
 
+from frontend.services.backend_api import buy_marketplace_listing
 from frontend.services.catalog_service import (
     build_price_history,
     get_card,
@@ -97,7 +99,16 @@ def listing_detail(request, listing_id):
             elif quantity > listing["quantity"]:
                 error = f"Only {listing['quantity']} unit(s) available."
             else:
-                return redirect("home")
+                try:
+                    buy_marketplace_listing(
+                        user=request.user,
+                        listing_id=listing_id,
+                        quantity=quantity,
+                    )
+                except ValidationError as exc:
+                    error = "; ".join(exc.messages)
+                else:
+                    return redirect("home")
 
     return render(
         request,
