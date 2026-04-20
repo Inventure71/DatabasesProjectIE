@@ -45,7 +45,7 @@ class InventoryItem(TimeStampedModel):
                 fields=("owner", "card_variant", "condition"),
                 name="unique_inventory_owner_variant_condition",
             ),
-            models.CheckConstraint(condition=models.Q(quantity__gt=0), name="inventory_quantity_positive"),
+            models.CheckConstraint(condition=models.Q(quantity__gte=0), name="inventory_quantity_non_negative"),
             models.CheckConstraint(
                 condition=models.Q(reserved_quantity__gte=0),
                 name="inventory_reserved_non_negative",
@@ -66,8 +66,8 @@ class InventoryItem(TimeStampedModel):
 
     def clean(self):
         super().clean()
-        if self.quantity <= 0:
-            raise ValidationError({"quantity": "Quantity must be greater than zero."})
+        if self.quantity < 0:
+            raise ValidationError({"quantity": "Quantity cannot be negative."})
         if self.reserved_quantity < 0:
             raise ValidationError({"reserved_quantity": "Reserved quantity cannot be negative."})
         if self.reserved_quantity > self.quantity:

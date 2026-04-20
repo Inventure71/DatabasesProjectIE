@@ -20,6 +20,12 @@ This file tracks frontend work now that `frontend/` is a sibling Django app.
 
 ## Next Steps
 
+- [ ] Replace mock catalog/listing services with real backend-backed data contracts.
+- [ ] Add frontend pages and service functions for authenticated inventory management.
+- [ ] Add a real listing detail page and connect the buy flow to the backend purchase endpoint.
+- [ ] Add purchase history and sales history pages for authenticated users.
+- [ ] Add authenticated user/profile display using the backend current-user endpoint.
+- [ ] Remove or clearly isolate mock-only price history and similar-card UI until backend support exists.
 - [ ] Add service functions for inventory pages before building those templates.
 - [ ] Add mock API endpoints only when frontend JavaScript needs JSON.
 - [ ] Add tests for every frontend page or mock API contract used by templates or JavaScript.

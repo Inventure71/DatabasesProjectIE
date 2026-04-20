@@ -346,7 +346,7 @@ Steps:
   - acquired at
   - purchase price
 - [x] Define hard rules:
-  - quantity must be greater than 0
+  - quantity cannot be negative
   - reserved quantity cannot be negative
   - reserved quantity cannot exceed quantity
 - [x] Decide whether the same owner can have multiple rows for the same variant and condition
@@ -366,7 +366,9 @@ Current status:
 - [x] `InventoryHistory.inventory_item` references `InventoryItem`
 - [x] `InventoryHistory.created_by` references the Django user table and allows null when the actor is deleted
 - [x] Enforced one row per owner, card variant, and condition
-- [x] Enforced positive quantity
+- [x] Enforced non-negative quantity
+- [x] Direct inventory creation services still require positive quantity
+- [x] Inventory rows may reach zero quantity after marketplace sales so history and listing references remain intact
 - [x] Enforced non-negative reserved quantity
 - [x] Enforced reserved quantity not above total quantity
 - [x] Enforced non-negative purchase price when purchase price is present
@@ -378,6 +380,8 @@ Current status:
 - [x] Verified on 2026-04-20 that `python manage.py test inventory`, `python manage.py test catalog`, `python manage.py test users`, `python manage.py test common`, `python manage.py check`, `python manage.py makemigrations --check --dry-run`, and `python manage.py migrate --check` pass
 - [x] Verified on 2026-04-20 that `inventory.0001_initial` is applied
 - [x] Verified on 2026-04-20 that inventory models are registered in Django admin
+- [x] Created `inventory.0002_remove_inventoryitem_inventory_quantity_positive_and_more`
+- [x] Updated inventory quantity constraint from `quantity > 0` to `quantity >= 0` for marketplace purchases
 
 ## Phase 7: Inventory Services
 
@@ -469,11 +473,11 @@ What you should learn:
 - Why listing and order records must be separate from inventory rows
 
 Steps:
-- [ ] Create the `marketplace` app
-- [ ] Create the `market_listing` model
-- [ ] Create the `purchase_order` model
-- [ ] Create the `purchase_order_line` model
-- [ ] Add marketplace foreign keys:
+- [x] Create the `marketplace` app
+- [x] Create the `market_listing` model
+- [x] Create the `purchase_order` model
+- [x] Create the `purchase_order_line` model
+- [x] Add marketplace foreign keys:
   - `MarketListing.seller_id` references the Django user table
   - `MarketListing.inventory_item_id` references `InventoryItem.id`
   - `PurchaseOrder.buyer_id` references the Django user table
@@ -481,25 +485,47 @@ Steps:
   - `PurchaseOrderLine.purchase_order_id` references `PurchaseOrder.id`
   - `PurchaseOrderLine.listing_id` references `MarketListing.id`
   - `PurchaseOrderLine.card_variant_id` references `CardVariant.id`
-- [ ] Define listing statuses:
+- [x] Define listing statuses:
   - ACTIVE
   - PAUSED
   - SOLD_OUT
   - CANCELLED
-- [ ] Define order statuses:
+- [x] Define order statuses:
   - PENDING
   - COMPLETED
   - CANCELLED
   - FAILED
-- [ ] Add indexes for seller, status, and price lookups
-- [ ] Decide whether a listing references one inventory row directly
-- [ ] Decide whether listing quantity is independent from inventory quantity or derived from it
+- [x] Add indexes for seller, status, and price lookups
+- [x] Decide whether a listing references one inventory row directly
+- [x] Decide whether listing quantity is independent from inventory quantity or derived from it
 
 Verification:
-- [ ] Marketplace schema reflects the intended workflow without ambiguity
-- [ ] Status fields and indexes support the planned queries
-- [ ] Listings reference owned stock through `InventoryItem`, not generic catalog rows
-- [ ] Order lines snapshot `CardVariant`, quantity, and price for stable transaction history
+- [x] Marketplace schema reflects the intended workflow without ambiguity
+- [x] Status fields and indexes support the planned queries
+- [x] Listings reference owned stock through `InventoryItem`, not generic catalog rows
+- [x] Order lines snapshot `CardVariant`, quantity, and price for stable transaction history
+
+Current status:
+- [x] Implemented `MarketListing`
+- [x] Implemented `PurchaseOrder`
+- [x] Implemented `PurchaseOrderLine`
+- [x] `MarketListing.seller` references the Django user table
+- [x] `MarketListing.inventory_item` references `InventoryItem`
+- [x] `PurchaseOrder.buyer` references the Django user table
+- [x] `PurchaseOrder.seller` references the Django user table
+- [x] `PurchaseOrderLine.purchase_order` references `PurchaseOrder`
+- [x] `PurchaseOrderLine.listing` references `MarketListing`
+- [x] `PurchaseOrderLine.card_variant` references `CardVariant`
+- [x] Listings store `quantity` and `quantity_available`
+- [x] Listing quantity is stored on the listing, but future listing services must keep it consistent with inventory reservation rules
+- [x] Listing model validation rejects inventory owned by a different seller
+- [x] Listing model validation rejects zero quantity, over-available quantity, negative price, and sold-out rows with available quantity
+- [x] Order model validation rejects negative totals and buyer=seller orders
+- [x] Order line model validation rejects invalid quantity, invalid price, mismatched card variant, and listings from the wrong seller
+- [x] Registered marketplace models in Django admin
+- [x] Created `marketplace.0001_initial`
+- [x] Verified on 2026-04-20 that marketplace tests first failed because marketplace models did not exist
+- [x] Verified on 2026-04-20 that `python manage.py test marketplace` passes after adding marketplace models
 
 ## Phase 10: Listing Services
 
@@ -511,23 +537,39 @@ What you should learn:
 - Why listing creation must validate ownership and available stock
 
 Steps:
-- [ ] Create service to create a listing
-- [ ] Validate:
+- [x] Create service to create a listing
+- [x] Validate:
   - seller owns the inventory item
   - listing quantity is positive
   - enough unreserved quantity exists
-- [ ] Decide what happens to stock when listing is created:
+- [x] Decide what happens to stock when listing is created:
   - reserve immediately
-  - or reserve only during purchase
-- [ ] Create service to pause a listing
-- [ ] Create service to cancel a listing
-- [ ] Create service to mark a listing sold out
-- [ ] Ensure state transitions are explicit and not scattered across views
+- [x] Create service to pause a listing
+- [x] Create service to cancel a listing
+- [x] Create service to mark a listing sold out
+- [x] Ensure state transitions are explicit and not scattered across views
 
 Verification:
-- [ ] Cannot list cards not owned by the seller
-- [ ] Cannot list more than available stock
-- [ ] Pause and cancel transitions behave predictably
+- [x] Cannot list cards not owned by the seller
+- [x] Cannot list more than available stock
+- [x] Pause and cancel transitions behave predictably
+
+Current status:
+- [x] Implemented `create_listing`
+- [x] Implemented `pause_listing`
+- [x] Implemented `cancel_listing`
+- [x] Implemented `mark_listing_sold_out`
+- [x] `create_listing` locks the inventory row inside a transaction
+- [x] `create_listing` rejects inventory owned by another user
+- [x] `create_listing` rejects quantity above `InventoryItem.available_quantity`
+- [x] `create_listing` reserves inventory immediately through `inventory.services.reserve_quantity`
+- [x] `pause_listing` allows only active listings to become paused
+- [x] `cancel_listing` allows active or paused listings to become cancelled
+- [x] `cancel_listing` releases remaining available reserved quantity through `inventory.services.release_reserved_quantity`
+- [x] `mark_listing_sold_out` requires `quantity_available=0`
+- [x] Listing transition services reject the wrong seller
+- [x] Verified on 2026-04-20 that marketplace service tests first failed because listing service functions did not exist
+- [x] Verified on 2026-04-20 that `python manage.py test marketplace` passes after adding listing services
 
 ## Phase 11: Marketplace Read API
 
@@ -539,20 +581,35 @@ What you should learn:
 - Efficient listing queries
 
 Steps:
-- [ ] Add endpoint to browse active listings
-- [ ] Add endpoint to view listing details
-- [ ] Add endpoint for the seller own sales history
-- [ ] Add endpoint for the buyer own order history
-- [ ] Add filtering for:
+- [x] Add endpoint to browse active listings
+- [x] Add endpoint to view listing details
+- [x] Add endpoint for the seller own sales history
+- [x] Add endpoint for the buyer own order history
+- [x] Add filtering for:
   - seller
   - card variant
   - status
   - price range
-- [ ] Optimize common marketplace queries
+- [x] Optimize common marketplace queries
 
 Verification:
-- [ ] Public listing endpoints expose only intended data
-- [ ] Private history endpoints are properly scoped to the logged-in user
+- [x] Public listing endpoints expose only intended data
+- [x] Private history endpoints are properly scoped to the logged-in user
+
+Current status:
+- [x] Implemented `GET /api/marketplace/listings/`
+- [x] Implemented `GET /api/marketplace/listings/<id>/`
+- [x] Implemented `GET /api/marketplace/my/sales/`
+- [x] Implemented `GET /api/marketplace/my/purchases/`
+- [x] Public listing endpoints expose only active listings with `quantity_available > 0`
+- [x] Listing detail returns `404 Not Found` for paused, cancelled, sold-out, or unavailable listings
+- [x] Listing list supports filters for seller id, card variant id, active status, minimum price, and maximum price
+- [x] Private sales history is scoped to `seller=request.user`
+- [x] Private purchase history is scoped to `buyer=request.user`
+- [x] Marketplace read serializers return seller/buyer summaries, nested card variant data, listing data, order data, and order lines
+- [x] Marketplace read views use `select_related` and `prefetch_related` for common listing and order history queries
+- [x] Verified on 2026-04-20 that marketplace API tests first failed because marketplace route names did not exist
+- [x] Verified on 2026-04-20 that `python manage.py test marketplace` passes after adding marketplace read API
 
 ## Phase 12: Purchase Transaction Workflow
 
@@ -565,8 +622,8 @@ What you should learn:
 - Why concurrency bugs are the real backend difficulty here
 
 Steps:
-- [ ] Design the purchase service before coding it
-- [ ] Write the purchase workflow in exact order:
+- [x] Design the purchase service before coding it
+- [x] Write the purchase workflow in exact order:
   - begin transaction
   - lock listing row
   - lock seller inventory row
@@ -580,19 +637,38 @@ Steps:
   - update listing status or remaining quantity
   - mark order completed
   - commit
-- [ ] Define failure behavior clearly:
+- [x] Define failure behavior clearly:
   - insufficient stock
   - inactive listing
   - seller buying own listing if disallowed
   - database error
-- [ ] Keep the whole state transition in a service function
-- [ ] Ensure rollback happens automatically on failure
+- [x] Keep the whole state transition in a service function
+- [x] Ensure rollback happens automatically on failure
 
 Verification:
-- [ ] Successful purchase updates seller inventory correctly
-- [ ] Successful purchase creates buyer inventory correctly
-- [ ] Successful purchase creates order and order line records
-- [ ] Failed purchase leaves data unchanged
+- [x] Successful purchase updates seller inventory correctly
+- [x] Successful purchase creates buyer inventory correctly
+- [x] Successful purchase creates order and order line records
+- [x] Failed purchase leaves data unchanged
+
+Current status:
+- [x] Implemented `purchase_listing`
+- [x] `purchase_listing` validates positive purchase quantity
+- [x] `purchase_listing` locks the listing row
+- [x] `purchase_listing` locks the seller inventory row
+- [x] `purchase_listing` rejects inactive listings
+- [x] `purchase_listing` rejects purchases above `quantity_available`
+- [x] `purchase_listing` rejects sellers buying their own listings
+- [x] `purchase_listing` creates a completed `PurchaseOrder`
+- [x] `purchase_listing` creates a `PurchaseOrderLine` snapshot with listing, variant, quantity, and unit price
+- [x] `purchase_listing` decreases seller `quantity` and `reserved_quantity`
+- [x] `purchase_listing` creates or merges buyer inventory with `merge_purchased_item`
+- [x] `purchase_listing` writes seller `DECREASE` history and buyer `PURCHASE` history
+- [x] `purchase_listing` decreases listing `quantity_available`
+- [x] `purchase_listing` marks listings `SOLD_OUT` when `quantity_available` reaches zero
+- [x] Failed purchase validations happen inside one transaction and leave order, listing, and inventory state unchanged
+- [x] Verified on 2026-04-20 that purchase workflow tests first failed because `purchase_listing` did not exist
+- [x] Verified on 2026-04-20 that targeted inventory and marketplace purchase tests pass after adding purchase workflow
 
 ## Phase 13: Buy Endpoint
 
@@ -604,16 +680,31 @@ What you should learn:
 - How request validation should feed a service layer
 
 Steps:
-- [ ] Add buy endpoint for a listing
-- [ ] Validate request payload
-- [ ] Call the purchase service
-- [ ] Return clear success and error responses
-- [ ] Prevent direct model mutation from the view
+- [x] Add buy endpoint for a listing
+- [x] Validate request payload
+- [x] Call the purchase service
+- [x] Return clear success and error responses
+- [x] Prevent direct model mutation from the view
 
 Verification:
-- [ ] Endpoint succeeds on valid purchases
-- [ ] Endpoint fails cleanly on invalid purchases
-- [ ] Responses are consistent and understandable
+- [x] Endpoint succeeds on valid purchases
+- [x] Endpoint fails cleanly on invalid purchases
+- [x] Responses are consistent and understandable
+
+Current status:
+- [x] Implemented `POST /api/marketplace/listings/<id>/buy/`
+- [x] Buy endpoint requires authentication
+- [x] Buy endpoint validates `quantity` with `BuyListingSerializer`
+- [x] Buy endpoint calls `marketplace.services.purchase_listing`
+- [x] Buy endpoint returns the created completed order with nested order lines
+- [x] Buy endpoint returns serializer errors for invalid request shape
+- [x] Buy endpoint returns `400 Bad Request` for service validation failures
+- [x] Buy endpoint rejects anonymous purchases
+- [x] Buy endpoint rejects inactive listing purchases
+- [x] Buy endpoint rejects seller self-purchases
+- [x] Verified on 2026-04-20 that buy endpoint tests first failed because the route did not exist
+- [x] Verified on 2026-04-20 that `python manage.py test marketplace` passes after adding the buy endpoint
+- [x] Verified on 2026-04-20 that full backend verification passes: `python manage.py check`, `python manage.py makemigrations --check --dry-run`, `python manage.py migrate --check`, and `python manage.py test common catalog users inventory marketplace pricing`
 
 ## Phase 14: Pricing Module
 
@@ -625,23 +716,40 @@ What you should learn:
 - Why current value and historical value serve different purposes
 
 Steps:
-- [ ] Create the `pricing` app
-- [ ] Create the `price_snapshot` model
-- [ ] Define fields:
+- [x] Confirm the `pricing` app exists
+- [x] Create the `price_snapshot` model
+- [x] Define fields:
   - card variant
   - price
   - currency
   - source name
   - captured at
-- [ ] Create service to insert a price snapshot
-- [ ] Create service to update `card_variant.current_value` from the newest snapshot
-- [ ] Create query logic to read price history for a variant
-- [ ] Create query logic to estimate a user collection total value
+- [x] Create service to insert a price snapshot
+- [x] Create service to update `card_variant.current_value` from the newest snapshot
+- [x] Create query logic to read price history for a variant
+- [x] Create query logic to estimate a user collection total value
 
 Verification:
-- [ ] New snapshots are stored correctly
-- [ ] Current value updates correctly
-- [ ] Price history endpoint returns records in the correct order
+- [x] New snapshots are stored correctly
+- [x] Current value updates correctly
+- [x] Price history query returns records in the correct order
+
+Current status:
+- [x] Implemented `pricing.models.PriceSnapshot`
+- [x] `PriceSnapshot.card_variant_id` references `catalog.CardVariant.id`
+- [x] `PriceSnapshot.price` is constrained to be non-negative
+- [x] `PriceSnapshot.currency` defaults to `EUR`
+- [x] `PriceSnapshot.source_name` records where the price came from
+- [x] `PriceSnapshot.captured_at` records when the price was captured
+- [x] Implemented `record_price_snapshot`
+- [x] Implemented `update_current_value_from_latest_snapshot`
+- [x] Implemented `get_variant_price_history`
+- [x] Implemented `estimate_collection_value`
+- [x] Registered `PriceSnapshot` in Django admin
+- [x] Created `pricing.0001_initial`
+- [x] Verified on 2026-04-20 that pricing tests first failed because `PriceSnapshot` did not exist
+- [x] Verified on 2026-04-20 that `python manage.py check` and `python manage.py test pricing` pass after adding the pricing model and services
+- [x] Verified on 2026-04-20 that full backend verification passes: `python manage.py check`, `python manage.py makemigrations --check --dry-run`, `python manage.py migrate --check`, and `python manage.py test common catalog users inventory marketplace pricing`
 
 ## Phase 15: Pricing API
 
@@ -652,13 +760,26 @@ What you should learn:
 - How to expose historical data without overcomplicating the API
 
 Steps:
-- [ ] Add endpoint for variant price history
-- [ ] Decide whether collection valuation belongs in MVP or a later extension
-- [ ] If included, add authenticated collection valuation endpoint
+- [x] Add endpoint for variant price history
+- [x] Decide whether collection valuation belongs in MVP or a later extension
+- [x] If included, add authenticated collection valuation endpoint
 
 Verification:
-- [ ] Price history endpoint works for seeded data
-- [ ] Collection valuation is correct if implemented
+- [x] Price history endpoint works for seeded data
+- [x] Collection valuation is correct if implemented
+
+Current status:
+- [x] Implemented `GET /api/pricing/variants/<variant_id>/history/`
+- [x] Variant price history endpoint is public read-only data
+- [x] Variant price history returns snapshots newest first
+- [x] Variant price history returns `404 Not Found` for missing variants
+- [x] Included collection valuation in the MVP because Phase 14 already has the service and users need a portfolio total
+- [x] Implemented `GET /api/pricing/my/collection-value/`
+- [x] Collection valuation endpoint requires authentication
+- [x] Collection valuation returns the authenticated user's total current collection value
+- [x] Verified on 2026-04-20 that pricing API tests first failed because pricing route names did not exist
+- [x] Verified on 2026-04-20 that `python manage.py test pricing` passes after adding pricing API endpoints
+- [x] Verified on 2026-04-20 that full backend verification passes: `python manage.py check`, `python manage.py makemigrations --check --dry-run`, `python manage.py migrate --check`, and `python manage.py test common catalog users inventory marketplace pricing`
 
 ## Phase 16: Testing Strategy
 
@@ -670,56 +791,93 @@ What you should learn:
 - Why the purchase flow needs stronger testing than the rest
 
 Steps:
-- [ ] Set up the test framework and test database strategy
-- [ ] Write model tests for:
+- [x] Set up the test framework and test database strategy
+- [x] Write model tests for:
   - catalog constraints
   - inventory constraints
   - listing status rules
-- [ ] Write service tests for:
+- [x] Write service tests for:
   - inventory changes
   - listing creation
   - purchase flow
   - pricing updates
-- [ ] Write API tests for:
+- [x] Write API tests for:
   - catalog reads
   - inventory endpoints
   - listings endpoints
   - buy endpoint
-- [ ] Add integration tests for:
+- [x] Add integration tests for:
   - create listing from owned inventory
   - successful purchase
   - failed purchase due to insufficient quantity
   - inventory history correctness
 
 Verification:
-- [ ] Core business logic is covered by tests
-- [ ] Purchase flow has both success and failure coverage
-- [ ] Test suite passes consistently
+- [x] Core business logic is covered by tests
+- [x] Purchase flow has both success and failure coverage
+- [x] Test suite passes consistently
 
-## Phase 17: Admin and Seed Data
+Current status:
+- [x] Test framework uses Django `TestCase`, `TransactionTestCase`, and DRF `APITestCase`
+- [x] Test database is created and destroyed by Django test runner
+- [x] Catalog model/API tests cover catalog constraints, variants, images, seed data, filters, and query count
+- [x] Inventory model/service/API tests cover ownership, quantities, reservations, history, and user isolation
+- [x] Marketplace model/service/API tests cover listing rules, order rules, listing reads, order history, and buy endpoint behavior
+- [x] Pricing model/service/API tests cover snapshots, current value updates, history ordering, and collection valuation
+- [x] Added buy endpoint integration coverage for successful purchase inventory history
+- [x] Added buy endpoint integration coverage for failed over-quantity purchase with no side effects
+- [x] Verified on 2026-04-20 that `python manage.py test marketplace.tests.BuyEndpointTests` passes with 7 tests
+- [x] Verified on 2026-04-20 that full backend verification passes: `python manage.py check`, `python manage.py makemigrations --check --dry-run`, `python manage.py migrate --check`, and `python manage.py test common catalog users inventory marketplace pricing`
+
+## Phase 17: Admin Improvements
 
 Goal:
-- Make the system demoable and inspectable
+- Make the system easier to inspect through Django admin
 
 What you should learn:
 - Why admin tooling matters for backend development
-- Why seed data helps debugging and demos
+- How admin configuration can make relational data easier to inspect safely
 
 Steps:
-- [ ] Improve admin configuration for catalog, inventory, and marketplace models
-- [ ] Create a repeatable seed command or fixture strategy
-- [ ] Seed:
+- [x] Improve admin configuration for catalog, inventory, marketplace, and pricing models
+- [x] Add admin tests for important inspection behavior
+- [x] Keep audit-like records protected from accidental admin creation/deletion
+- [x] Defer seed/demo data work until the real dataset strategy is designed
+
+Verification:
+- [x] Admin configuration passes Django system checks
+- [x] Admin tests verify FK-heavy pages use `list_select_related` and autocomplete where useful
+- [x] Admin tests verify inventory history and order-line records are read-only/audit-oriented in admin
+
+Current status:
+- [x] Catalog admin uses autocomplete and `list_select_related` for variant/image inspection
+- [x] Inventory admin uses autocomplete and `list_select_related` for owner/card lookups
+- [x] Inventory history admin is read-only for add/delete operations
+- [x] Marketplace admin uses autocomplete and `list_select_related` for listings and orders
+- [x] Purchase order lines are read-only in order admin and direct order-line admin
+- [x] Pricing admin uses autocomplete and `list_select_related` for snapshot inspection
+- [x] Verified on 2026-04-20 that admin tests first failed because optimized admin configuration was missing
+- [x] Verified on 2026-04-20 that `python manage.py check` and targeted admin tests pass after admin improvements
+- [x] Verified on 2026-04-20 that full backend verification passes: `python manage.py check`, `python manage.py makemigrations --check --dry-run`, `python manage.py migrate --check`, and `python manage.py test common catalog users inventory marketplace pricing`
+
+## Future Dataset Work
+
+Goal:
+- Create real repeatable data once the dataset shape is decided
+
+Deferred steps:
+- [ ] Create a repeatable seed command, fixture strategy, or dataset import pipeline
+- [ ] Seed or import:
   - users
   - cards
   - variants
   - inventory
   - listings
   - price snapshots
-- [ ] Verify seeded data makes the app usable immediately
 
-Verification:
-- [ ] Fresh setup can be seeded successfully
-- [ ] Demo flows work on seeded data
+Deferred verification:
+- [ ] Fresh setup can load the dataset successfully
+- [ ] Demo flows work on loaded dataset
 
 ## Phase 18: Optional Similarity Module
 
@@ -776,15 +934,15 @@ Strict order:
 - [x] Phase 6
 - [x] Phase 7
 - [x] Phase 8
-- [ ] Phase 9
-- [ ] Phase 10
-- [ ] Phase 11
-- [ ] Phase 12
-- [ ] Phase 13
-- [ ] Phase 14
-- [ ] Phase 15
-- [ ] Phase 16
-- [ ] Phase 17
+- [x] Phase 9
+- [x] Phase 10
+- [x] Phase 11
+- [x] Phase 12
+- [x] Phase 13
+- [x] Phase 14
+- [x] Phase 15
+- [x] Phase 16
+- [x] Phase 17
 - [ ] Phase 18 only if time remains
 
 ## What We Should Do First Together
@@ -804,10 +962,10 @@ The backend MVP is done when all of the following are true:
 - [ ] Users can authenticate
 - [ ] Catalog data exists and is queryable
 - [x] Users can manage inventory
-- [ ] Sellers can create listings from owned cards
-- [ ] Buyers can buy listed cards safely
-- [ ] Inventory updates remain consistent after purchase
-- [ ] Orders are recorded
+- [x] Sellers can create listings from owned cards
+- [x] Buyers can buy listed cards safely
+- [x] Inventory updates remain consistent after purchase
+- [x] Orders are recorded
 - [ ] Price history is stored and readable
 - [ ] Core tests pass
 
@@ -819,3 +977,14 @@ We are explicitly not prioritizing these right now:
 - [ ] Notifications
 - [ ] Recommendation systems beyond optional similarity
 - [ ] Complex analytics dashboards
+
+## Backend Cleanup Audit
+
+Recorded on 2026-04-20 after reviewing backend code for outdated code, leftovers, backward-compatibility migration paths, and unnecessary repetition.
+
+- [ ] Decide whether to remove or properly maintain `InventoryItem.is_for_sale`; marketplace listing state now lives on `MarketListing`, and services do not update the inventory flag.
+- [ ] Remove generated `__pycache__/` directories from the backend working tree if they are not needed locally.
+- [ ] Clean Django startapp boilerplate in empty scaffold files, especially `common.views` and the current placeholder `pricing` files.
+- [ ] Decide whether `backend/PLAN.md` is still authoritative; it now conflicts with the implemented marketplace field names, routes, and MVP scope.
+- [ ] Consider consolidating repeated compact card/set/user serializer shapes after inventory, marketplace, and pricing API shapes stabilize.
+- [ ] Consider extracting repeated catalog/user/listing fixture builders in backend tests once the next backend phase adds more tests.

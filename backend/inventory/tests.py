@@ -1,6 +1,7 @@
 from decimal import Decimal
 from io import StringIO
 
+from django.contrib import admin
 from django.contrib.auth import get_user_model
 from django.core.exceptions import ValidationError
 from django.core.management import call_command
@@ -74,12 +75,22 @@ class InventoryModelTests(TestCase):
                 quantity=1,
             )
 
-    def test_quantity_must_be_greater_than_zero(self):
+    def test_quantity_can_be_zero_after_stock_is_sold(self):
         item = InventoryItem(
             owner=self.owner,
             card_variant=self.variant,
             condition=InventoryItem.Condition.NEAR_MINT,
             quantity=0,
+        )
+
+        item.full_clean()
+
+    def test_quantity_cannot_be_negative(self):
+        item = InventoryItem(
+            owner=self.owner,
+            card_variant=self.variant,
+            condition=InventoryItem.Condition.NEAR_MINT,
+            quantity=-1,
         )
 
         with self.assertRaises(ValidationError):
@@ -317,6 +328,25 @@ class InventoryServiceTests(TestCase):
         history = item.history_entries.get()
         self.assertEqual(history.change_type, InventoryHistory.ChangeType.PURCHASE)
         self.assertEqual(history.quantity_delta, 1)
+
+
+class InventoryAdminTests(TestCase):
+    def test_inventory_item_admin_is_optimized_for_owner_and_variant_inspection(self):
+        item_admin = admin.site._registry[InventoryItem]
+
+        self.assertEqual(item_admin.list_select_related, ("owner", "card_variant__card", "card_variant__set"))
+        self.assertEqual(item_admin.autocomplete_fields, ("owner", "card_variant"))
+        self.assertIn("available_quantity", item_admin.readonly_fields)
+
+    def test_inventory_history_admin_is_read_only_audit_log(self):
+        history_admin = admin.site._registry[InventoryHistory]
+
+        self.assertFalse(history_admin.has_add_permission(None))
+        self.assertFalse(history_admin.has_delete_permission(None))
+        self.assertEqual(
+            history_admin.readonly_fields,
+            ("inventory_item", "change_type", "quantity_delta", "created_by", "note", "created_at"),
+        )
 
 
 class InventoryApiTests(APITestCase):
