@@ -1,10 +1,8 @@
 from decimal import Decimal
-from io import StringIO
 
 from django.contrib import admin
 from django.contrib.auth import get_user_model
 from django.core.exceptions import ValidationError
-from django.core.management import call_command
 from django.db import IntegrityError, transaction
 from django.test import TestCase
 from django.urls import reverse
@@ -59,7 +57,7 @@ class InventoryModelTests(TestCase):
         self.assertIn(item, self.owner.inventory_items.all())
         self.assertIn(item, self.variant.inventory_items.all())
 
-    def test_owner_variant_condition_combination_is_unique(self):
+    def test_same_owner_variant_condition_is_one_aggregate_inventory_bucket(self):
         InventoryItem.objects.create(
             owner=self.owner,
             card_variant=self.variant,
@@ -74,6 +72,15 @@ class InventoryModelTests(TestCase):
                 condition=InventoryItem.Condition.NEAR_MINT,
                 quantity=1,
             )
+
+        self.assertEqual(
+            InventoryItem.objects.filter(
+                owner=self.owner,
+                card_variant=self.variant,
+                condition=InventoryItem.Condition.NEAR_MINT,
+            ).count(),
+            1,
+        )
 
     def test_quantity_can_be_zero_after_stock_is_sold(self):
         item = InventoryItem(
@@ -190,7 +197,7 @@ class InventoryServiceTests(TestCase):
         self.assertEqual(history.quantity_delta, 2)
         self.assertEqual(history.created_by, self.owner)
 
-    def test_add_inventory_item_merges_existing_owner_variant_condition(self):
+    def test_add_inventory_item_merges_same_owner_variant_condition_into_one_bucket(self):
         first_item = add_inventory_item(
             owner=self.owner,
             card_variant=self.variant,
@@ -352,7 +359,17 @@ class InventoryAdminTests(TestCase):
 class InventoryApiTests(APITestCase):
     @classmethod
     def setUpTestData(cls):
-        call_command("seed_catalog", stdout=StringIO())
+        game = CardGame.objects.create(name="Inventory API TCG", slug="inventory-api-tcg")
+        card_set = CardSet.objects.create(game=game, name="Inventory API Set", code="INVAPI")
+        card = Card.objects.create(game=game, name="Inventory API Dragon")
+        cls.variant = CardVariant.objects.create(
+            card=card,
+            set=card_set,
+            collector_number="1/99",
+            rarity=CardVariant.Rarity.RARE,
+            finish=CardVariant.Finish.HOLO,
+            language="en",
+        )
 
     def setUp(self):
         self.owner = get_user_model().objects.create_user(
@@ -363,7 +380,7 @@ class InventoryApiTests(APITestCase):
             username="other-api",
             password="test-password",
         )
-        self.variant = CardVariant.objects.get(card__name="Charizard", language="en")
+        self.variant = self.__class__.variant
 
     def test_anonymous_user_cannot_list_inventory(self):
         response = self.client.get(reverse("inventory-my-list"))
@@ -390,7 +407,7 @@ class InventoryApiTests(APITestCase):
         self.assertEqual(response.status_code, status.HTTP_200_OK)
         self.assertEqual(len(response.data), 1)
         self.assertEqual(response.data[0]["id"], own_item.id)
-        self.assertEqual(response.data[0]["card_variant"]["card"]["name"], "Charizard")
+        self.assertEqual(response.data[0]["card_variant"]["card"]["name"], "Inventory API Dragon")
         self.assertEqual(response.data[0]["available_quantity"], 2)
 
     def test_add_inventory_endpoint_uses_service_and_writes_history(self):
@@ -413,6 +430,32 @@ class InventoryApiTests(APITestCase):
         history = item.history_entries.get()
         self.assertEqual(history.change_type, InventoryHistory.ChangeType.ADD)
         self.assertEqual(history.created_by, self.owner)
+
+    def test_add_inventory_endpoint_merges_same_owner_variant_condition(self):
+        add_inventory_item(
+            owner=self.owner,
+            card_variant=self.variant,
+            condition=InventoryItem.Condition.NEAR_MINT,
+            quantity=1,
+            actor=self.owner,
+        )
+        self.client.force_authenticate(user=self.owner)
+
+        response = self.client.post(
+            reverse("inventory-my-add"),
+            {
+                "card_variant_id": self.variant.id,
+                "condition": InventoryItem.Condition.NEAR_MINT,
+                "quantity": 2,
+            },
+            format="json",
+        )
+
+        self.assertEqual(response.status_code, status.HTTP_201_CREATED)
+        item = InventoryItem.objects.get(owner=self.owner, card_variant=self.variant)
+        self.assertEqual(item.quantity, 3)
+        self.assertEqual(item.history_entries.count(), 2)
+        self.assertEqual(response.data["quantity"], 3)
 
     def test_update_endpoint_can_increase_reserve_and_release_stock(self):
         item = add_inventory_item(

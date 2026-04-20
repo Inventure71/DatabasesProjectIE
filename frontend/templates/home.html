@@ -12,10 +12,51 @@
     <h1 class="hero__title">Buy & Sell<br><span>Rare Cards</span></h1>
     <p class="hero__subtitle">Discover thousands of cards, manage your collection, and trade with collectors worldwide.</p>
 
-    <form class="search-form" method="GET">
+    <form class="search-form" method="GET" action="{% url 'catalog' %}">
         <input type="text" name="q" placeholder="Search by card name, set, rarity…" value="{{ request.GET.q }}">
         <button type="submit" class="btn btn-gold">Search</button>
     </form>
+</section>
+
+{% if showcase_card %}
+<!-- MONTHLY TOP SALE SHOWCASE -->
+<section class="section kinetic-card-preview" aria-labelledby="kinetic-card-preview-title">
+    <div class="kinetic-card-preview__copy">
+        <span class="hero__eyebrow">
+            {% if showcase_is_sale %}Most expensive card sold this month{% else %}Waiting for this month's first sale{% endif %}
+        </span>
+        <h2 class="section__title" id="kinetic-card-preview-title">{{ showcase_card.name }}</h2>
+        <p class="kinetic-card-preview__meta">
+            {{ showcase_card.set_name }} / {{ showcase_card.rarity }}
+            {% if showcase_is_sale %}
+                <span class="kinetic-card-preview__price">${{ showcase_card.sale_price }}</span>
+            {% endif %}
+        </p>
+    </div>
+    <div class="kinetic-card-preview__stage">
+        <a class="kinetic-card-preview__link" href="{% url 'card_detail' showcase_card.id %}" aria-label="View {{ showcase_card.name }}">
+            {% include "components/kinetic_card.html" with card=showcase_card kinetic_card_class="kinetic-card--showcase" %}
+        </a>
+    </div>
+</section>
+{% endif %}
+
+<!-- LATEST LISTINGS -->
+<section class="section">
+    <div class="section__header">
+        <h2 class="section__title">Latest Listings</h2>
+        <a href="{% url 'catalog' %}?available=1#browser" class="section__link">Browse all →</a>
+    </div>
+
+    <div class="listing-grid">
+        {% for listing in latest_listings %}
+            {% include "components/listing_item.html" %}
+        {% empty %}
+            <div class="empty-state">
+                <p>No listings available right now.</p>
+            </div>
+        {% endfor %}
+    </div>
 </section>
 
 <!-- FEATURED CARDS -->
@@ -31,24 +72,6 @@
         {% empty %}
             <div class="empty-state">
                 <p>No featured cards at the moment.</p>
-            </div>
-        {% endfor %}
-    </div>
-</section>
-
-<!-- LATEST LISTINGS -->
-<section class="section">
-    <div class="section__header">
-        <h2 class="section__title">Latest Listings</h2>
-        <a href="{% url 'listings' %}" class="section__link">Browse all →</a>
-    </div>
-
-    <div class="listing-grid">
-        {% for listing in latest_listings %}
-            {% include "components/listing_item.html" %}
-        {% empty %}
-            <div class="empty-state">
-                <p>No listings available right now.</p>
             </div>
         {% endfor %}
     </div>

@@ -45,7 +45,7 @@ Steps:
   - Buying flow
   - Price history
   - Exclude similarity from the first working MVP if time gets tight
-- [ ] Define the key invariant for stock:
+- [x] Define the key invariant for stock:
   - A listing can only sell cards the seller actually owns
   - Stock updates must happen inside a transaction
   - Reserved quantity rules must be explicit
@@ -57,7 +57,8 @@ Current status:
 - [x] Confirmed backend stack and implemented project foundation with Django, Django REST Framework, MySQL, and Django built-in auth
 - [x] Confirmed backend app boundaries: `common`, `users`, `catalog`, `inventory`, `marketplace`, and `pricing`
 - [x] Confirmed similarity is optional later work and not part of the first transactional marketplace slice
-- [ ] Reserved quantity behavior still needs a precise rule before listing services are implemented
+- [x] Inventory uses an aggregate stock rule: one row per owner, card variant, and condition; duplicate additions increase quantity on that row.
+- [x] Listing creation reserves quantity from aggregate inventory, and purchase/cancel flows update reserved stock transactionally.
 
 ## Phase 1: Backend Foundation
 
@@ -105,6 +106,7 @@ Current status:
 - [x] Moved Django command entrypoint to repository-root `manage.py` so `backend/` and `frontend/` can be sibling folders
 - [x] Verified on 2026-04-20 that root `python manage.py check` passes with no issues
 - [x] Verified on 2026-04-20 that `python manage.py test common catalog users inventory marketplace pricing` runs 46 tests successfully
+- [x] Verified on 2026-04-20 that the broader suite `python manage.py test common catalog users inventory marketplace pricing frontend --keepdb` runs 148 tests successfully after choosing the aggregate inventory model.
 - [x] Verified that Django apps exist under `backend/`
 - [x] Verified that `requirements.txt` includes Django, Django REST Framework, MySQL client, and python-dotenv
 - [x] Verified on 2026-04-20 that `.env` exists with the expected keys
@@ -267,11 +269,8 @@ Current status:
 - [x] Created and applied `catalog.0003_remove_cardimage_is_primary`
 - [x] Verified on 2026-04-20 that creating a duplicate `CardImage` for the same `CardVariant` raises `IntegrityError`
 - [x] Verified on 2026-04-20 that `python manage.py test catalog`, `python manage.py test users`, `python manage.py test common`, `python manage.py check`, `python manage.py makemigrations --check --dry-run`, and `python manage.py migrate --check` pass after enforcing the rule
-- [x] Implemented repeatable `seed_catalog` management command
-- [x] Seed command creates 1 game, 1 set, 2 cards, 3 variants, and 3 images
-- [x] Verified on 2026-04-20 that running `python manage.py seed_catalog` twice does not duplicate catalog rows
-- [x] Verified on 2026-04-20 that seeded variants reference the expected game, set, cards, and one-to-one images
-- [x] Verified on 2026-04-20 that the development database has 1 game, 1 set, 2 cards, 3 variants, and 3 images after seeding
+- [x] Removed the old `seed_catalog` sample command so development data comes from the real dataset import path
+- [x] Kept catalog tests independent from sample seed data by creating explicit test fixtures
 
 ## Phase 5: Catalog Read API
 
@@ -309,6 +308,7 @@ Current status:
 - [x] Implemented `GET /api/catalog/variants/<id>/`
 - [x] Implemented `GET /api/catalog/sets/`
 - [x] Implemented card filters for `name`, `game`, `set`, and `rarity`
+- [x] Added page-number pagination for `GET /api/catalog/cards/`
 - [x] Ordered card list by card name and set list by game/name
 - [x] Used `select_related` and `prefetch_related` for catalog read queries
 - [x] Verified on 2026-04-20 that new API tests first failed because catalog routes were missing
@@ -666,9 +666,11 @@ Current status:
 - [x] `purchase_listing` writes seller `DECREASE` history and buyer `PURCHASE` history
 - [x] `purchase_listing` decreases listing `quantity_available`
 - [x] `purchase_listing` marks listings `SOLD_OUT` when `quantity_available` reaches zero
+- [x] `purchase_listing` records a `marketplace_sale` `PriceSnapshot` for completed sales and refreshes the variant current value from that sale
 - [x] Failed purchase validations happen inside one transaction and leave order, listing, and inventory state unchanged
 - [x] Verified on 2026-04-20 that purchase workflow tests first failed because `purchase_listing` did not exist
 - [x] Verified on 2026-04-20 that targeted inventory and marketplace purchase tests pass after adding purchase workflow
+- [x] Verified on 2026-04-20 that purchase workflow tests first failed because completed purchases did not create price snapshots, then passed after wiring marketplace purchases into pricing snapshots
 
 ## Phase 13: Buy Endpoint
 
@@ -725,7 +727,7 @@ Steps:
   - source name
   - captured at
 - [x] Create service to insert a price snapshot
-- [x] Create service to update `card_variant.current_value` from the newest snapshot
+- [x] Create service to update `card_variant.current_value` from recent price history
 - [x] Create query logic to read price history for a variant
 - [x] Create query logic to estimate a user collection total value
 
@@ -745,8 +747,14 @@ Current status:
 - [x] Implemented `update_current_value_from_latest_snapshot`
 - [x] Implemented `get_variant_price_history`
 - [x] Implemented `estimate_collection_value`
+- [x] Marketplace purchases now create price snapshots with source `marketplace_sale`
+- [x] `card_variant.current_value` now uses the average of the last 100 `marketplace_sale` prices when sale snapshots exist, with newest snapshot fallback only when there are no sale snapshots yet
+- [x] Existing completed marketplace order lines are backfilled into `PriceSnapshot` by `pricing.0002_backfill_marketplace_sale_price_snapshots`
+- [x] Existing variant current values are recalculated from recent marketplace sale snapshots by `pricing.0003_recalculate_current_value_from_recent_sales`
 - [x] Registered `PriceSnapshot` in Django admin
 - [x] Created `pricing.0001_initial`
+- [x] Created `pricing.0002_backfill_marketplace_sale_price_snapshots`
+- [x] Created `pricing.0003_recalculate_current_value_from_recent_sales`
 - [x] Verified on 2026-04-20 that pricing tests first failed because `PriceSnapshot` did not exist
 - [x] Verified on 2026-04-20 that `python manage.py check` and `python manage.py test pricing` pass after adding the pricing model and services
 - [x] Verified on 2026-04-20 that full backend verification passes: `python manage.py check`, `python manage.py makemigrations --check --dry-run`, `python manage.py migrate --check`, and `python manage.py test common catalog users inventory marketplace pricing`
@@ -765,7 +773,7 @@ Steps:
 - [x] If included, add authenticated collection valuation endpoint
 
 Verification:
-- [x] Price history endpoint works for seeded data
+- [x] Price history endpoint works for representative catalog data
 - [x] Collection valuation is correct if implemented
 
 Current status:
@@ -866,8 +874,12 @@ Goal:
 - Create real repeatable data once the dataset shape is decided
 
 Deferred steps:
-- [ ] Create a repeatable seed command, fixture strategy, or dataset import pipeline
-- [ ] Seed or import:
+- [x] Create a repeatable dataset import command for the downloaded Pokemon cards CSV
+- [x] Import available Base Set and Jungle Pokemon cards as ownable catalog variants
+- [x] Avoid duplicate catalog rows when the import command is rerun
+- [x] Clear old sample-only image metadata when imported rows are refreshed from the CSV
+- [ ] Expand the dataset import later when we choose the source for missing Trainer/Energy cards
+- [ ] Seed or import later:
   - users
   - cards
   - variants
@@ -876,7 +888,8 @@ Deferred steps:
   - price snapshots
 
 Deferred verification:
-- [ ] Fresh setup can load the dataset successfully
+- [x] Fresh setup can load the partial Base Set and Jungle card dataset successfully
+- [x] Running the partial Base Set and Jungle import twice does not duplicate imported rows
 - [ ] Demo flows work on loaded dataset
 
 ## Phase 18: Optional Similarity Module

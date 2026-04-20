@@ -1,4 +1,4 @@
-from decimal import Decimal
+from decimal import Decimal, ROUND_HALF_UP
 
 from django.core.exceptions import ValidationError
 from django.db import transaction
@@ -6,6 +6,10 @@ from django.db import transaction
 from catalog.models import CardVariant
 from inventory.models import InventoryItem
 from pricing.models import PriceSnapshot
+
+MARKETPLACE_SALE_SOURCE = "marketplace_sale"
+RECENT_SALE_LIMIT = 100
+MONEY_QUANTUM = Decimal("0.01")
 
 
 def record_price_snapshot(
@@ -39,11 +43,11 @@ def record_price_snapshot(
 def update_current_value_from_latest_snapshot(*, card_variant):
     with transaction.atomic():
         variant = CardVariant.objects.select_for_update().get(pk=card_variant.pk)
-        latest_snapshot = PriceSnapshot.objects.filter(card_variant=variant).first()
-        if latest_snapshot is None:
+        current_value = _calculate_current_value_from_price_history(card_variant=variant)
+        if current_value is None:
             raise ValidationError("Cannot update current value without price snapshots.")
 
-        variant.current_value = latest_snapshot.price
+        variant.current_value = current_value
         variant.full_clean()
         variant.save(update_fields=("current_value", "updated_at"))
         return variant
@@ -66,3 +70,22 @@ def estimate_collection_value(*, owner):
         total += item.card_variant.current_value * item.quantity
 
     return total
+
+
+def _calculate_current_value_from_price_history(*, card_variant):
+    recent_sale_prices = list(
+        PriceSnapshot.objects.filter(
+            card_variant=card_variant,
+            source_name=MARKETPLACE_SALE_SOURCE,
+        )
+        .order_by("-captured_at", "-id")
+        .values_list("price", flat=True)[:RECENT_SALE_LIMIT]
+    )
+    if recent_sale_prices:
+        average_price = sum(recent_sale_prices, Decimal("0.00")) / Decimal(len(recent_sale_prices))
+        return average_price.quantize(MONEY_QUANTUM, rounding=ROUND_HALF_UP)
+
+    latest_snapshot = PriceSnapshot.objects.filter(card_variant=card_variant).first()
+    if latest_snapshot is None:
+        return None
+    return latest_snapshot.price

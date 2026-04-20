@@ -1,8 +1,14 @@
+from django.core.paginator import Paginator
+from django.db.models import Exists, OuterRef
+from django.utils import timezone
+
 from catalog.models import Card, CardGame, CardSet, CardVariant
-from marketplace.models import MarketListing
+from marketplace.models import MarketListing, PurchaseOrder, PurchaseOrderLine
 from pricing.models import PriceSnapshot
 
 RARITIES = [choice[0] for choice in CardVariant.Rarity.choices]
+DEFAULT_PAGE_SIZE = 24
+MAX_PAGE_SIZE = 100
 
 
 def _getlist(params, name):
@@ -22,7 +28,76 @@ def _maximum_price(params):
     return raw_value if raw_value else None
 
 
-def list_cards(params):
+def _available_only(params):
+    return params.get("available", "") in {"1", "true", "on", "yes"}
+
+
+def list_cards(params, *, limit=None):
+    queryset = _filter_and_sort_display_variants(params)
+    if limit is not None:
+        queryset = queryset[:limit]
+    return [_variant_to_frontend_card(variant) for variant in queryset]
+
+
+def get_most_expensive_card_sold_this_month():
+    now = timezone.localtime()
+    month_start = now.replace(day=1, hour=0, minute=0, second=0, microsecond=0)
+    if month_start.month == 12:
+        next_month_start = month_start.replace(year=month_start.year + 1, month=1)
+    else:
+        next_month_start = month_start.replace(month=month_start.month + 1)
+
+    line = (
+        PurchaseOrderLine.objects.filter(
+            purchase_order__status=PurchaseOrder.Status.COMPLETED,
+            purchase_order__created_at__gte=month_start,
+            purchase_order__created_at__lt=next_month_start,
+        )
+        .select_related(
+            "purchase_order",
+            "card_variant__card__game",
+            "card_variant__set",
+            "card_variant__image",
+        )
+        .order_by("-unit_price", "-purchase_order__created_at", "-id")
+        .first()
+    )
+    if line is None:
+        return None
+
+    card = _variant_to_frontend_card(line.card_variant)
+    card.update(
+        {
+            "sale_price": line.unit_price,
+            "sale_quantity": line.quantity,
+            "sale_total": line.line_total,
+            "sale_currency": line.purchase_order.currency,
+            "sold_at": line.purchase_order.created_at,
+        }
+    )
+    return card
+
+
+def list_card_page(params):
+    page_size = _positive_int(params.get("page_size"), DEFAULT_PAGE_SIZE)
+    page_size = min(page_size, MAX_PAGE_SIZE)
+    paginator = Paginator(_filter_and_sort_display_variants(params), page_size)
+    page_obj = paginator.get_page(params.get("page"))
+
+    return {
+        "results": [_variant_to_frontend_card(variant) for variant in page_obj.object_list],
+        "count": paginator.count,
+        "page": page_obj.number,
+        "page_size": page_size,
+        "num_pages": paginator.num_pages,
+        "has_previous": page_obj.has_previous(),
+        "has_next": page_obj.has_next(),
+        "previous_page_number": page_obj.previous_page_number() if page_obj.has_previous() else None,
+        "next_page_number": page_obj.next_page_number() if page_obj.has_next() else None,
+    }
+
+
+def _filter_and_sort_display_variants(params):
     queryset = _display_variant_queryset()
     query = params.get("q", "").strip()
     game = params.get("game", "")
@@ -31,6 +106,7 @@ def list_cards(params):
     selected_rarities = [rarity for rarity in _getlist(params, "rarity") if rarity]
     min_price = _minimum_price(params)
     max_price = _maximum_price(params)
+    available_only = _available_only(params)
 
     if query:
         queryset = queryset.filter(card__name__icontains=query)
@@ -46,6 +122,13 @@ def list_cards(params):
         queryset = queryset.filter(current_value__gte=min_price)
     if max_price is not None:
         queryset = queryset.filter(current_value__lte=max_price)
+    if available_only:
+        active_listing = MarketListing.objects.filter(
+            inventory_item__card_variant=OuterRef("pk"),
+            status=MarketListing.Status.ACTIVE,
+            quantity_available__gt=0,
+        )
+        queryset = queryset.annotate(has_active_listing=Exists(active_listing)).filter(has_active_listing=True)
 
     sort = params.get("sort", "name")
     if sort == "value_desc":
@@ -57,7 +140,7 @@ def list_cards(params):
     else:
         queryset = queryset.order_by("card__name", "set__name", "collector_number", "id")
 
-    return [_variant_to_frontend_card(variant) for variant in queryset]
+    return queryset
 
 
 def get_card(card_id):
@@ -148,6 +231,14 @@ def build_price_history(card):
 
 def _display_variant_queryset():
     return CardVariant.objects.select_related("card__game", "set", "image")
+
+
+def _positive_int(raw_value, default):
+    try:
+        value = int(raw_value)
+    except (TypeError, ValueError):
+        return default
+    return value if value > 0 else default
 
 
 def _first_display_variant(card):

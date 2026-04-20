@@ -4,6 +4,7 @@ from django.db import transaction
 from inventory.models import InventoryHistory, InventoryItem
 from inventory.services import merge_purchased_item, release_reserved_quantity, reserve_quantity
 from marketplace.models import MarketListing, PurchaseOrder, PurchaseOrderLine
+from pricing.services import record_price_snapshot
 
 
 def create_listing(*, seller, inventory_item, quantity, unit_price, currency="EUR"):
@@ -150,6 +151,13 @@ def purchase_listing(*, buyer, listing, quantity):
         order.status = PurchaseOrder.Status.COMPLETED
         order.full_clean()
         order.save(update_fields=("status", "updated_at"))
+        record_price_snapshot(
+            card_variant=seller_inventory.card_variant,
+            price=listing.unit_price,
+            currency=listing.currency,
+            source_name="marketplace_sale",
+            captured_at=order.created_at,
+        )
         return order
 
 

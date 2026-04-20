@@ -1,3 +1,4 @@
+from rest_framework.pagination import PageNumberPagination
 from rest_framework.generics import ListAPIView, RetrieveAPIView
 
 from catalog.models import Card, CardSet, CardVariant
@@ -9,8 +10,15 @@ from catalog.serializers import (
 )
 
 
+class CatalogPageNumberPagination(PageNumberPagination):
+    page_size = 24
+    page_size_query_param = "page_size"
+    max_page_size = 100
+
+
 class CardListView(ListAPIView):
     serializer_class = CardListSerializer
+    pagination_class = CatalogPageNumberPagination
 
     def get_queryset(self):
         queryset = Card.objects.select_related("game").order_by("name")

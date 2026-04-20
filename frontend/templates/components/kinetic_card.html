@@ -1,0 +1,15 @@
+<div class="kinetic-card{% if kinetic_card_class %} {{ kinetic_card_class }}{% endif %}" data-kinetic-card>
+    <div class="kinetic-card__tilt">
+        <div class="kinetic-card__depth" aria-hidden="true"></div>
+        <div class="kinetic-card__edge" aria-hidden="true"></div>
+        <div class="kinetic-card__surface">
+            {% if card.image_url %}
+                <img class="kinetic-card__image" src="{{ card.image_url }}" alt="{{ card.name }}" draggable="false">
+            {% else %}
+                <div class="kinetic-card__placeholder" role="img" aria-label="{{ card.name }}">Card</div>
+            {% endif %}
+            <div class="kinetic-card__wash" aria-hidden="true"></div>
+            <div class="kinetic-card__sheen" aria-hidden="true"></div>
+        </div>
+    </div>
+</div>

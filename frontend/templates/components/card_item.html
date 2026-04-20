@@ -1,11 +1,7 @@
 <a href="{% url 'card_detail' card.id %}" class="card-tile">
  
     <div class="card-tile__image-wrap">
-        {% if card.image_url %}
-            <img src="{{ card.image_url }}" alt="{{ card.name }}">
-        {% else %}
-            <div class="card-tile__image-placeholder">🃏</div>
-        {% endif %}
+        {% include "components/kinetic_card.html" with card=card kinetic_card_class="kinetic-card--tile" %}
     </div>
  
     <div class="card-tile__body">

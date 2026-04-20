@@ -7,7 +7,13 @@
  
 <section class="page-header">
     <h1 class="page-header__title">Card Catalog</h1>
-    <p class="page-header__subtitle">Browse {{ total_cards }} cards across all sets and games.</p>
+    <p class="page-header__subtitle">
+        {% if selected_available %}
+            Browse cards with active marketplace listings.
+        {% else %}
+            Browse {{ total_cards }} cards across all sets and games.
+        {% endif %}
+    </p>
 </section>
  
 <!-- SEARCH + FILTERS -->
@@ -15,11 +21,12 @@
  
     <!-- SIDEBAR FILTERS -->
     <aside class="filter-sidebar">
-        <form method="GET" action="{% url 'catalog' %}" id="filter-form">
+        <form method="GET" action="{% url 'catalog' %}#browser" id="filter-form">
+            <input type="hidden" name="view" value="{{ browser.view }}">
  
             <div class="filter-sidebar__header">
                 <span class="filter-sidebar__title">Filters</span>
-                <a href="{% url 'catalog' %}" class="filter-clear">Clear all</a>
+                <a href="{% url 'catalog' %}#browser" class="filter-clear">Clear all</a>
             </div>
  
             <!-- Search -->
@@ -32,8 +39,23 @@
                         name="q"
                         placeholder="Card name…"
                         value="{{ request.GET.q }}"
+                        oninput="this.form.elements.view.value='card'"
                     >
                 </div>
+            </div>
+
+            <!-- Availability -->
+            <div class="filter-group">
+                <label class="filter-checkbox">
+                    <input
+                        type="checkbox"
+                        name="available"
+                        value="1"
+                        {% if selected_available %}checked{% endif %}
+                        onchange="this.form.submit()"
+                    >
+                    <span>Only available</span>
+                </label>
             </div>
  
             <!-- Game -->
@@ -124,12 +146,13 @@
     </aside>
  
     <!-- RESULTS AREA -->
-    <div class="catalog-results">
+    <div class="catalog-results" id="browser">
+        {% include "components/browser_view_controls.html" %}
  
         <!-- Sort + count bar -->
         <div class="catalog-bar">
             <span class="catalog-bar__count">
-                {% if cards %}{{ cards|length }} result{% if cards|length != 1 %}s{% endif %}{% else %}No results{% endif %}
+                {% if result_count %}{{ result_count }} result{% if result_count != 1 %}s{% endif %}{% else %}No results{% endif %}
             </span>
             <div class="catalog-bar__sort">
                 <label class="filter-label" style="margin:0">Sort by</label>
@@ -141,19 +164,7 @@
                 </select>
             </div>
         </div>
- 
-        <!-- Card grid -->
-        <div class="card-grid">
-            {% for card in cards %}
-                {% include "components/card_item.html" %}
-            {% empty %}
-                <div class="empty-state">
-                    <p style="font-size:2rem">🔍</p>
-                    <p>No cards match your filters.</p>
-                    <a href="{% url 'catalog' %}" class="btn btn-outline-gold btn-sm" style="margin-top:16px">Clear filters</a>
-                </div>
-            {% endfor %}
-        </div>
+        {% include "components/browser_results.html" %}
  
     </div>
 </div>

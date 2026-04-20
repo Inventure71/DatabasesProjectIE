@@ -1,0 +1,142 @@
+{% extends "base.html" %}
+{% load static %}
+
+{% block title %}My Collection — Card Marketplace{% endblock %}
+
+{% block content %}
+
+<section class="page-header collection-header">
+    <div>
+        <h1 class="page-header__title">My Collection</h1>
+        <p class="page-header__subtitle">Track owned cards, reserved stock, and create listings from inventory you control.</p>
+    </div>
+    <div class="collection-owner">
+        <span class="collection-owner__label">Owner</span>
+        <span class="collection-owner__name">{{ user.username }}</span>
+    </div>
+</section>
+
+{% if listed_id %}
+    <div class="collection-alert collection-alert--success">
+        Listing created. Your reserved stock is now available in the marketplace.
+    </div>
+{% endif %}
+
+{% if error %}
+    <div class="collection-alert collection-alert--error">
+        {{ error }}
+    </div>
+{% endif %}
+
+<section class="collection-stats" aria-label="Collection summary">
+    <div class="collection-stat">
+        <span class="collection-stat__label">Estimated Value</span>
+        <span class="collection-stat__value">${{ collection_value.total_value }}</span>
+    </div>
+    <div class="collection-stat">
+        <span class="collection-stat__label">Owned Cards</span>
+        <span class="collection-stat__value">{{ summary.total_quantity }}</span>
+    </div>
+    <div class="collection-stat">
+        <span class="collection-stat__label">Available</span>
+        <span class="collection-stat__value">{{ summary.available_quantity }}</span>
+    </div>
+    <div class="collection-stat">
+        <span class="collection-stat__label">Reserved</span>
+        <span class="collection-stat__value">{{ summary.reserved_quantity }}</span>
+    </div>
+</section>
+
+<div class="catalog-layout collection-browser">
+    <aside class="filter-sidebar">
+        <form method="GET" action="{% url 'collection' %}#browser" id="collection-filter-form">
+            <input type="hidden" name="view" value="{{ browser.view }}">
+
+            <div class="filter-sidebar__header">
+                <span class="filter-sidebar__title">Filters</span>
+                <a href="{% url 'collection' %}#browser" class="filter-clear">Clear all</a>
+            </div>
+
+            <div class="filter-group">
+                <label class="filter-label">Search</label>
+                <input class="form-input form-input--sm" type="text" name="q" placeholder="Card name…" value="{{ request.GET.q }}" oninput="this.form.elements.view.value='card'">
+            </div>
+
+            <div class="filter-group">
+                <label class="filter-label">Game</label>
+                <select class="form-select" name="game" onchange="this.form.submit()">
+                    <option value="">All Games</option>
+                    {% for game in games %}
+                        <option value="{{ game }}" {% if request.GET.game == game %}selected{% endif %}>{{ game }}</option>
+                    {% endfor %}
+                </select>
+            </div>
+
+            <div class="filter-group">
+                <label class="filter-label">Set</label>
+                <select class="form-select" name="set" onchange="this.form.submit()">
+                    <option value="">All Sets</option>
+                    {% for set in sets %}
+                        <option value="{{ set }}" {% if request.GET.set == set %}selected{% endif %}>{{ set }}</option>
+                    {% endfor %}
+                </select>
+            </div>
+
+            <div class="filter-group">
+                <label class="filter-label">My Listings</label>
+                <select class="form-select" name="my_listings" onchange="this.form.submit()">
+                    <option value="">All owned cards</option>
+                    <option value="listed" {% if request.GET.my_listings == "listed" %}selected{% endif %}>Listed only</option>
+                </select>
+            </div>
+
+            <div class="filter-group">
+                <label class="filter-label">Rarity</label>
+                <div class="filter-checkboxes">
+                    {% for rarity in rarities %}
+                        <label class="filter-checkbox">
+                            <input type="checkbox" name="rarity" value="{{ rarity }}" {% if rarity in selected_rarities %}checked{% endif %} onchange="this.form.submit()">
+                            <span class="rarity-badge rarity-badge--{{ rarity|lower }}">{{ rarity }}</span>
+                        </label>
+                    {% endfor %}
+                </div>
+            </div>
+
+            <div class="filter-group">
+                <label class="filter-label">Language</label>
+                <select class="form-select" name="language" onchange="this.form.submit()">
+                    <option value="">All Languages</option>
+                    {% for lang in languages %}
+                        <option value="{{ lang }}" {% if request.GET.language == lang %}selected{% endif %}>{{ lang }}</option>
+                    {% endfor %}
+                </select>
+            </div>
+
+            <div class="filter-group">
+                <label class="filter-label">Price Range</label>
+                <div class="filter-price-row">
+                    <input class="form-input form-input--sm" type="number" name="min_price" placeholder="Min $" value="{{ request.GET.min_price }}" min="0">
+                    <span class="filter-price-sep">—</span>
+                    <input class="form-input form-input--sm" type="number" name="max_price" placeholder="Max $" value="{{ request.GET.max_price }}" min="0">
+                </div>
+            </div>
+
+            <button type="submit" class="btn btn-gold" style="width:100%; justify-content:center;">Apply</button>
+        </form>
+    </aside>
+
+    <section class="catalog-results collection-album" id="browser">
+        <div class="section__header">
+            <h2 class="section__title">Owned Inventory Albums</h2>
+            <div class="section__actions">
+                <a href="{% url 'collection' %}?view=card&my_listings=listed#browser" class="section__link">View listed cards →</a>
+                <a href="{% url 'catalog' %}" class="section__link">Find more cards →</a>
+            </div>
+        </div>
+
+        {% include "components/browser_view_controls.html" %}
+        {% include "components/browser_results.html" %}
+    </section>
+</div>
+
+{% endblock %}

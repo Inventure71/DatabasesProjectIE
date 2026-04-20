@@ -1,0 +1,184 @@
+{% if browser.view == "card" %}
+    <section class="album-page browser-results" aria-label="Album Page">
+        <div class="album-page__header">
+            <div>
+                <span class="album-page__eyebrow">Album Page</span>
+                <h3 class="album-page__title">Cards</h3>
+            </div>
+            <span class="album-page__count">
+                Page {{ browser.page.number }} of {{ browser.page.num_pages }} · {{ browser.page.count }} result{{ browser.page.count|pluralize }}
+            </span>
+        </div>
+
+        {% if browser.page.items %}
+            <div class="album-card-grid{% if browser.mode == 'collection' %} album-card-grid--sleeves{% endif %}">
+                {% for slot in browser.page.items %}
+                    <article class="album-card-slot{% if browser.mode == 'collection' %} album-card-slot--sleeve{% endif %}{% if browser.mode == 'collection' and slot.record.has_active_listings %} album-card-slot--listed{% endif %}">
+                        {% if browser.mode == "collection" %}
+                            <a href="{% url 'card_detail' slot.card.id %}" class="album-card-sleeve">
+                                <span class="album-card-sleeve__image">
+                                    {% include "components/kinetic_card.html" with card=slot.card kinetic_card_class="kinetic-card--album-sleeve" %}
+                                    {% if slot.record.has_active_listings %}
+                                        <span class="album-card-sleeve__badge">
+                                            Listed · {{ slot.record.listed_quantity }} listed
+                                        </span>
+                                    {% endif %}
+                                </span>
+                                <span class="album-card-sleeve__caption">
+                                    <span class="album-card-sleeve__name">{{ slot.card.name }}</span>
+                                    <span class="album-card-sleeve__meta">{{ slot.card.set_name }} · {{ slot.record.condition_label }}</span>
+                                </span>
+                            </a>
+                        {% else %}
+                            <a href="{% url 'card_detail' slot.card.id %}" class="album-card-slot__image album-card-slot__image-link" aria-label="View {{ slot.card.name }}">
+                                {% include "components/kinetic_card.html" with card=slot.card kinetic_card_class="kinetic-card--album" %}
+                            </a>
+
+                            <div class="album-card-slot__body">
+                                <a href="{% url 'card_detail' slot.card.id %}" class="album-card-slot__name">
+                                    {{ slot.card.name }}
+                                </a>
+                                <div class="album-card-slot__meta">
+                                    <span class="rarity-badge rarity-badge--{{ slot.card.rarity|lower }}">{{ slot.card.rarity }}</span>
+                                    <span>{{ slot.card.set_name }}</span>
+                                    {% if browser.mode == "listings" or browser.mode == "my_listings" %}
+                                        <span>{{ slot.record.condition|default:"Near Mint" }}</span>
+                                    {% endif %}
+                                </div>
+
+                                {% if browser.mode == "catalog" %}
+                                    <dl class="album-card-slot__stats album-card-slot__stats--catalog" aria-label="Catalog card data">
+                                        <div>
+                                            <dt>Language</dt>
+                                            <dd>{{ slot.card.language }}</dd>
+                                        </div>
+                                        <div>
+                                            <dt>Finish</dt>
+                                            <dd>{{ slot.card.finish }}</dd>
+                                        </div>
+                                        <div class="album-card-slot__stat--value">
+                                            <dt>Value</dt>
+                                            <dd>${{ slot.card.current_value }}</dd>
+                                        </div>
+                                    </dl>
+                                    <a href="{% url 'card_detail' slot.card.id %}" class="btn btn-outline-gold btn-sm album-card-slot__button">View Card</a>
+                                {% elif browser.mode == "listings" %}
+                                    <dl class="album-card-slot__stats" aria-label="Listing data">
+                                        <div>
+                                            <dt>Seller</dt>
+                                            <dd>{{ slot.record.seller.username }}</dd>
+                                        </div>
+                                        <div>
+                                            <dt>Available</dt>
+                                            <dd>{{ slot.record.quantity }}</dd>
+                                        </div>
+                                        <div>
+                                            <dt>Price</dt>
+                                            <dd>${{ slot.record.price_per_unit }}</dd>
+                                        </div>
+                                    </dl>
+                                    {% if user.is_authenticated %}
+                                        <a href="{% url 'listing_detail' slot.record.id %}" class="btn btn-gold btn-sm album-card-slot__button">Buy Now</a>
+                                    {% else %}
+                                        <a href="{% url 'login' %}" class="btn btn-outline-gold btn-sm album-card-slot__button">Login to Buy</a>
+                                    {% endif %}
+                                {% elif browser.mode == "my_listings" %}
+                                    <dl class="album-card-slot__stats" aria-label="Listing counts">
+                                        <div>
+                                            <dt>Status</dt>
+                                            <dd>Listed</dd>
+                                        </div>
+                                        <div>
+                                            <dt>Available</dt>
+                                            <dd>{{ slot.record.quantity_available }}</dd>
+                                        </div>
+                                        <div>
+                                            <dt>Price</dt>
+                                            <dd>${{ slot.record.price_per_unit }}</dd>
+                                        </div>
+                                    </dl>
+                                    <a href="{% url 'listing_detail' slot.record.id %}" class="btn btn-outline-gold btn-sm album-card-slot__button">View Listing</a>
+                                {% endif %}
+                            </div>
+                        {% endif %}
+                    </article>
+                {% endfor %}
+            </div>
+
+            {% if browser.page.has_previous or browser.page.has_next %}
+                <nav class="pagination" aria-label="Album pages">
+                    {% if browser.page.has_previous %}
+                        <a class="btn btn-outline-gold btn-sm" href="?{{ browser.page.previous_query }}#browser">Previous</a>
+                    {% endif %}
+                    <span class="pagination__status">Page {{ browser.page.number }} of {{ browser.page.num_pages }}</span>
+                    {% if browser.page.has_next %}
+                        <a class="btn btn-outline-gold btn-sm" href="?{{ browser.page.next_query }}#browser">Next</a>
+                    {% endif %}
+                </nav>
+            {% endif %}
+        {% else %}
+            <div class="empty-state">
+                <p>No cards match your filters.</p>
+            </div>
+        {% endif %}
+    </section>
+{% elif browser.view == "set" %}
+    {% if browser.books %}
+        <div class="collection-book-shelf" aria-label="Collection book covers">
+            {% for book in browser.books %}
+                <a href="?{{ book.query }}#browser" class="collection-book{% if book.is_active %} collection-book--active{% endif %}">
+                    <span class="collection-book__cover">
+                        {% include "components/kinetic_card.html" with card=book.cover_card kinetic_card_class="kinetic-card--book" %}
+                    </span>
+                    <span class="collection-book__spine">
+                        <span class="collection-book__label">{{ book.set_name }}</span>
+                        <span class="collection-book__meta">
+                            {% if browser.mode == "listings" or browser.mode == "my_listings" %}
+                                {{ book.record_count }} listing{{ book.record_count|pluralize }} · {{ book.unit_count }} unit{{ book.unit_count|pluralize }}
+                            {% elif browser.mode == "collection" %}
+                                {{ book.record_count }} card{{ book.record_count|pluralize }} · {{ book.unit_count }} owned
+                            {% else %}
+                                {{ book.game }} · {{ book.record_count }} card{{ book.record_count|pluralize }}
+                            {% endif %}
+                        </span>
+                        <span class="collection-book__value">${{ book.total_value }}</span>
+                    </span>
+                </a>
+            {% endfor %}
+        </div>
+    {% else %}
+        <div class="empty-state">
+            <p>No collection books match your filters.</p>
+        </div>
+    {% endif %}
+{% elif browser.view == "shelf" %}
+    {% if browser.shelves %}
+        <div class="game-shelf-grid" aria-label="Game shelves">
+            {% for shelf in browser.shelves %}
+                <a href="?{{ shelf.query }}#browser" class="game-shelf{% if shelf.is_active %} game-shelf--active{% endif %}">
+                    <span class="game-shelf__rail" aria-hidden="true"></span>
+                    <span class="game-shelf__cover">
+                        {% include "components/kinetic_card.html" with card=shelf.cover_card kinetic_card_class="kinetic-card--book" %}
+                    </span>
+                    <span class="game-shelf__body">
+                        <span class="game-shelf__name">{{ shelf.game }}</span>
+                        <span class="game-shelf__meta">
+                            {% if browser.mode == "listings" or browser.mode == "my_listings" %}
+                                {{ shelf.set_count }} set{{ shelf.set_count|pluralize }} · {{ shelf.record_count }} listing{{ shelf.record_count|pluralize }}
+                            {% elif browser.mode == "collection" %}
+                                {{ shelf.set_count }} set{{ shelf.set_count|pluralize }} · {{ shelf.unit_count }} owned
+                            {% else %}
+                                {{ shelf.set_count }} set{{ shelf.set_count|pluralize }} · {{ shelf.record_count }} card{{ shelf.record_count|pluralize }}
+                            {% endif %}
+                        </span>
+                        <span class="game-shelf__value">${{ shelf.total_value }}</span>
+                    </span>
+                </a>
+            {% endfor %}
+        </div>
+    {% else %}
+        <div class="empty-state">
+            <p>No shelves match your filters.</p>
+        </div>
+    {% endif %}
+{% endif %}

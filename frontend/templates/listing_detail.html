@@ -6,16 +6,12 @@
 {% block content %}
 
 <div class="detail-back">
-    <a href="{% url 'listings' %}" class="detail-back__link">← Back to Listings</a>
+    <a href="{% url 'catalog' %}?available=1#browser" class="detail-back__link">← Back to Available Cards</a>
 </div>
 
 <div class="detail-hero">
     <div class="detail-image-wrap">
-        {% if listing.card.image_url %}
-            <img src="{{ listing.card.image_url }}" alt="{{ listing.card.name }}" class="detail-image">
-        {% else %}
-            <div class="detail-image-placeholder">🃏</div>
-        {% endif %}
+        {% include "components/kinetic_card.html" with card=listing.card kinetic_card_class="kinetic-card--detail" %}
     </div>
 
     <div class="detail-meta">

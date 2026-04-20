@@ -15,11 +15,7 @@
  
     <!-- LEFT: Image -->
     <div class="detail-image-wrap">
-        {% if card.image_url %}
-            <img src="{{ card.image_url }}" alt="{{ card.name }}" class="detail-image">
-        {% else %}
-            <div class="detail-image-placeholder">🃏</div>
-        {% endif %}
+        {% include "components/kinetic_card.html" with card=card kinetic_card_class="kinetic-card--detail" %}
     </div>
  
     <!-- RIGHT: Metadata -->
@@ -57,13 +53,83 @@
         </div>
  
         {% if user.is_authenticated %}
-            <a href="{% url 'catalog' %}" class="btn btn-gold detail-buy-btn">Browse Listings for this Card</a>
+            <a href="{% url 'catalog' %}?available=1&q={{ card.name|urlencode }}#browser" class="btn btn-gold detail-buy-btn">Browse Listings for this Card</a>
         {% else %}
             <a href="{% url 'login' %}" class="btn btn-outline-gold detail-buy-btn">Login to Buy</a>
         {% endif %}
  
     </div>
 </div>
+
+{% if listed_id %}
+    <div class="collection-alert collection-alert--success">
+        Listing created. Your copy is now available in the marketplace.
+    </div>
+{% endif %}
+
+{% if sell_error %}
+    <div class="collection-alert collection-alert--error">
+        {{ sell_error }}
+    </div>
+{% endif %}
+
+{% if user.is_authenticated %}
+<section class="section">
+    <div class="section__header">
+        <h2 class="section__title">Your Copies</h2>
+    </div>
+
+    {% if owned_inventory_items %}
+        <div class="owned-copy-list">
+            {% for item in owned_inventory_items %}
+                <article class="owned-copy-row">
+                    <div class="owned-copy-row__summary">
+                        <span class="owned-copy-row__condition">{{ item.condition_label }}</span>
+                        <span class="owned-copy-row__meta">
+                            {{ item.available_quantity }} available · {{ item.quantity }} owned
+                            {% if item.has_active_listings %} · {{ item.listed_quantity }} listed{% endif %}
+                        </span>
+                        {% if item.active_listings %}
+                            <div class="owned-copy-row__listings" aria-label="Listed Copies">
+                                <span class="owned-copy-row__listings-title">Listed Copies</span>
+                                {% for listing in item.active_listings %}
+                                    <a href="{% url 'listing_detail' listing.id %}" class="owned-copy-row__listing">
+                                        {{ listing.quantity_available }} listed · ${{ listing.price_per_unit }}
+                                    </a>
+                                {% endfor %}
+                            </div>
+                        {% endif %}
+                    </div>
+                    {% if item.has_active_listings %}
+                        <div class="owned-copy-row__status">Already listed</div>
+                    {% elif item.available_quantity > 0 %}
+                        <form class="owned-copy-row__form" method="post" action="{% url 'card_detail' card.id %}">
+                            {% csrf_token %}
+                            <input type="hidden" name="inventory_item_id" value="{{ item.id }}">
+                            <label class="collection-sell-form__field">
+                                <span>Qty</span>
+                                <input class="form-input form-input--sm" type="number" name="quantity" value="1" min="1" max="{{ item.available_quantity }}" required>
+                            </label>
+                            <label class="collection-sell-form__field">
+                                <span>Price</span>
+                                <input class="form-input form-input--sm" type="number" name="unit_price" value="{{ item.card.current_value }}" min="0.01" step="0.01" required>
+                            </label>
+                            <button type="submit" class="btn btn-gold btn-sm">List Copy</button>
+                        </form>
+                    {% else %}
+                        <div class="owned-copy-row__status">No available copies</div>
+                    {% endif %}
+                </article>
+            {% endfor %}
+        </div>
+    {% else %}
+        <div class="empty-state">
+            <p>You do not own a copy of this card yet.</p>
+            <a href="{% url 'catalog' %}" class="btn btn-outline-gold btn-sm" style="margin-top:16px">Browse Catalog</a>
+        </div>
+    {% endif %}
+</section>
+{% endif %}
  
 <!-- ACTIVE LISTINGS -->
 <section class="section">
