@@ -138,6 +138,7 @@ Tasks:
 
 * define models
 * define foreign keys and indexes
+* enforce the catalog reference pattern: `CardVariant` connects one `Card` to one `CardSet`
 * define rarity enum
 * define current value field
 * create migrations
@@ -157,6 +158,7 @@ Tables:
 Tasks:
 
 * define inventory rules
+* reference owned cards through `inventory_item.card_variant_id`
 * enforce quantity > 0
 * expose add/update/remove inventory actions
 * write service methods for stock changes
@@ -173,6 +175,7 @@ Tables:
 
 Tasks:
 
+* make listings reference owned stock through `market_listing.inventory_item_id`
 * listing creation
 * listing browse endpoint
 * purchase service
@@ -391,7 +394,46 @@ Fields:
 * line_total
 * created_at
 
-### 5.5 Pricing tables
+### 5.5 Cross-table reference map
+
+The backend must reference cards with foreign keys. Do not copy card names, set names, or variant labels into inventory or marketplace tables as the source of truth.
+
+Catalog references:
+
+* `card_set.game_id` -> `card_game.id`
+* `card.game_id` -> `card_game.id`
+* `card_variant.card_id` -> `card.id`
+* `card_variant.set_id` -> `card_set.id`
+* `card_image.card_variant_id` -> `card_variant.id`
+
+Ownership references:
+
+* `inventory_item.owner_id` -> Django user table
+* `inventory_item.card_variant_id` -> `card_variant.id`
+* `inventory_history.inventory_item_id` -> `inventory_item.id`
+* `inventory_history.related_listing_id` -> `market_listing.id`, nullable
+* `inventory_history.related_order_id` -> `purchase_order.id`, nullable
+* `inventory_history.created_by_id` -> Django user table
+
+Marketplace references:
+
+* `market_listing.seller_id` -> Django user table
+* `market_listing.inventory_item_id` -> `inventory_item.id`
+* `purchase_order.buyer_id` -> Django user table
+* `purchase_order.seller_id` -> Django user table
+* `purchase_order_line.purchase_order_id` -> `purchase_order.id`
+* `purchase_order_line.listing_id` -> `market_listing.id`
+* `purchase_order_line.card_variant_id` -> `card_variant.id`
+
+Design rule:
+
+* `Card` stores the abstract card identity and stable card text / stats.
+* `CardVariant` stores the exact catalog version: set, collector number, rarity, finish, language, edition, and current value.
+* `InventoryItem` stores user-owned stock of a `CardVariant`.
+* `MarketListing` stores a sale offer for a specific `InventoryItem`.
+* `PurchaseOrderLine` snapshots the bought `CardVariant`, quantity, and price so order history stays accurate even if the listing later changes.
+
+### 5.6 Pricing tables
 
 #### `price_snapshot`
 
@@ -405,7 +447,7 @@ Fields:
 * captured_at
 * created_at
 
-### 5.6 Similarity tables
+### 5.7 Similarity tables
 
 #### `card_embedding`
 

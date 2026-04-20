@@ -111,20 +111,37 @@ What you should learn:
 - How to separate reusable infrastructure from domain logic
 
 Steps:
-- [ ] Create a shared base model or common mixin for timestamps
-- [ ] Decide where enums will live
-- [ ] Decide where services will live inside each app
-- [ ] Decide where serializers will live
-- [ ] Decide URL organization:
+- [x] Create a shared base model or common mixin for timestamps
+- [x] Decide where enums will live
+- [x] Decide where services will live inside each app
+- [x] Decide where serializers will live
+- [x] Decide URL organization:
   - per-app routes
   - root API router
-- [ ] Decide error handling style for API responses
-- [ ] Decide whether to use custom permissions now or later
-- [ ] Enable Django admin and prepare it for catalog data inspection
+- [x] Decide error handling style for API responses
+- [x] Decide whether to use custom permissions now or later
+- [x] Decide admin convention for model inspection
 
 Verification:
-- [ ] Shared model conventions are in place
-- [ ] API layout is consistent before feature work begins
+- [x] Shared model conventions are in place
+- [x] API layout is consistent before feature work begins
+
+Current status:
+- [x] Verified on 2026-04-20 that `common.models.TimeStampedModel` provides abstract `created_at` and `updated_at` fields
+- [x] Verified on 2026-04-20 that `python manage.py test common` passes
+- [x] Verified on 2026-04-20 that `python manage.py check` passes after adding `common`
+- [x] Verified on 2026-04-20 that `python manage.py makemigrations --check --dry-run` reports no changes for the abstract base model
+- [x] Agreed on 2026-04-20 that model-owned enums live in each app's `models.py` using Django `TextChoices`
+- [x] Agreed on 2026-04-20 that business logic and state changes live in each app's `services.py`
+- [x] Agreed on 2026-04-20 that API serializers live in each app's `serializers.py`
+- [x] Agreed on 2026-04-20 that each app owns `urls.py` and `config/urls.py` includes app route modules
+- [x] Agreed on 2026-04-20 that admin registration happens as models are created
+- [x] Documented agreed backend rules in `backend/_system_design/backend_rules.md`
+- [x] Created `serializers.py`, `services.py`, and `urls.py` convention files for domain apps on 2026-04-20
+- [x] Wired root API route groups in `config/urls.py` on 2026-04-20
+- [x] Agreed on 2026-04-20 to keep service error handling simple and translate service validation failures into DRF `400 Bad Request` responses for now
+- [x] Agreed on 2026-04-20 to use DRF built-in permissions first and defer custom permissions until ownership rules require them
+- [x] Verified on 2026-04-20 that `python manage.py check`, `python manage.py test common`, and `python manage.py makemigrations --check --dry-run` pass after URL skeleton setup
 
 ## Phase 3: Users Module
 
@@ -136,24 +153,42 @@ What you should learn:
 - When to extend auth with a profile instead of replacing the user model
 
 Steps:
-- [ ] Decide whether to use default Django `User` plus `user_profile`
-- [ ] Create the `users` app
-- [ ] Create the `user_profile` model
-- [ ] Add fields:
+- [x] Decide whether to use default Django `User` plus `user_profile`
+- [x] Create the `users` app
+- [x] Create the `user_profile` model
+- [x] Add fields:
   - display name
   - bio
   - country
   - avatar URL
-- [ ] Register user-related models in Django admin
-- [ ] Decide authentication approach for the API:
+- [x] Register user-related models in Django admin
+- [x] Decide authentication approach for the API:
   - session auth for early development
   - token or JWT later if needed
-- [ ] Add a basic authenticated endpoint to confirm user access works
+- [x] Add a basic authenticated endpoint to confirm user access works
 
 Verification:
 - [ ] Can create users from admin
-- [ ] Can create and view profiles
-- [ ] Authenticated endpoint rejects anonymous access and accepts logged-in users
+- [x] Can create and view profiles
+- [x] Authenticated endpoint rejects anonymous access and accepts logged-in users
+
+Current status:
+- [x] Agreed to use Django built-in `User` plus `users.UserProfile`
+- [x] Implemented `UserProfile` with `OneToOneField` to `settings.AUTH_USER_MODEL`
+- [x] Implemented profile fields: `display_name`, `bio`, `country`, and `avatar_url`
+- [x] `UserProfile` inherits `common.models.TimeStampedModel`
+- [x] Registered `UserProfile` in Django admin
+- [x] Created and applied `users.0001_initial`
+- [x] Verified on 2026-04-20 that the initial `users` test failed before implementation because `UserProfile` did not exist
+- [x] Verified on 2026-04-20 that `python manage.py test users` passes
+- [x] Verified on 2026-04-20 that `python manage.py test common` passes
+- [x] Verified on 2026-04-20 that `python manage.py check` passes
+- [x] Verified on 2026-04-20 that `python manage.py makemigrations --check --dry-run` reports no changes
+- [x] Implemented `GET /api/users/me/` using `CurrentUserView`
+- [x] Implemented `UserProfileSerializer` and `CurrentUserSerializer`
+- [x] Verified on 2026-04-20 that anonymous requests to `users-me` are rejected
+- [x] Verified on 2026-04-20 that authenticated requests to `users-me` return user and profile data
+- [x] Verified on 2026-04-20 that `python manage.py test users`, `python manage.py test common`, `python manage.py check`, and `python manage.py makemigrations --check --dry-run` pass after adding the endpoint
 
 ## Phase 4: Catalog Data Model
 
@@ -180,11 +215,20 @@ Steps:
 
 Substeps for model review:
 - [ ] Confirm each relationship direction is correct
+- [ ] Confirm catalog foreign keys:
+  - `CardSet.game_id` references `CardGame.id`
+  - `Card.game_id` references `CardGame.id`
+  - `CardVariant.card_id` references `Card.id`
+  - `CardVariant.set_id` references `CardSet.id`
+  - `CardImage.card_variant_id` references `CardVariant.id`
 - [ ] Confirm nullable fields are justified
 - [ ] Confirm uniqueness rules where needed:
   - set code
   - collector number within the right scope
   - one primary image rule if enforced
+- [ ] Confirm the conceptual split:
+  - `Card` stores stable card identity, text, and stats
+  - `CardVariant` stores set-specific, print-specific, language-specific, and market-specific data
 
 Verification:
 - [ ] Catalog migrations apply cleanly
@@ -234,6 +278,13 @@ Steps:
 - [ ] Create the `inventory` app
 - [ ] Create the `inventory_item` model
 - [ ] Create the `inventory_history` model
+- [ ] Add inventory foreign keys:
+  - `InventoryItem.owner_id` references the Django user table
+  - `InventoryItem.card_variant_id` references `CardVariant.id`
+  - `InventoryHistory.inventory_item_id` references `InventoryItem.id`
+  - `InventoryHistory.related_listing_id` optionally references `MarketListing.id`
+  - `InventoryHistory.related_order_id` optionally references `PurchaseOrder.id`
+  - `InventoryHistory.created_by_id` references the Django user table
 - [ ] Add inventory fields:
   - owner
   - card variant
@@ -254,6 +305,7 @@ Steps:
 Verification:
 - [ ] Invalid inventory states are blocked
 - [ ] Inventory rows can be created and inspected cleanly
+- [ ] Inventory references exact `CardVariant` rows, not abstract `Card` rows
 
 ## Phase 7: Inventory Services
 
@@ -319,6 +371,14 @@ Steps:
 - [ ] Create the `market_listing` model
 - [ ] Create the `purchase_order` model
 - [ ] Create the `purchase_order_line` model
+- [ ] Add marketplace foreign keys:
+  - `MarketListing.seller_id` references the Django user table
+  - `MarketListing.inventory_item_id` references `InventoryItem.id`
+  - `PurchaseOrder.buyer_id` references the Django user table
+  - `PurchaseOrder.seller_id` references the Django user table
+  - `PurchaseOrderLine.purchase_order_id` references `PurchaseOrder.id`
+  - `PurchaseOrderLine.listing_id` references `MarketListing.id`
+  - `PurchaseOrderLine.card_variant_id` references `CardVariant.id`
 - [ ] Define listing statuses:
   - ACTIVE
   - PAUSED
@@ -336,6 +396,8 @@ Steps:
 Verification:
 - [ ] Marketplace schema reflects the intended workflow without ambiguity
 - [ ] Status fields and indexes support the planned queries
+- [ ] Listings reference owned stock through `InventoryItem`, not generic catalog rows
+- [ ] Order lines snapshot `CardVariant`, quantity, and price for stable transaction history
 
 ## Phase 10: Listing Services
 
@@ -585,8 +647,8 @@ Verification:
 
 Strict order:
 - [ ] Phase 0
-- [ ] Phase 1
-- [ ] Phase 2
+- [x] Phase 1
+- [x] Phase 2
 - [ ] Phase 3
 - [ ] Phase 4
 - [ ] Phase 5
@@ -612,7 +674,7 @@ Immediate next steps:
 - [x] Configure MySQL and environment variables
 - [x] Create the Django apps
 - [x] Add shared settings
-- [ ] Add shared backend conventions
+- [x] Add shared backend conventions
 - [x] Run the initial migrations
 
 ## Done Definition For The MVP
