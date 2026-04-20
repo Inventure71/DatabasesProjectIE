@@ -294,35 +294,58 @@ Decision:
 - Code should access the image from a variant as `variant.image`, not `variant.images.all()`.
 - `is_primary` was removed because the concept is redundant when only one image can exist.
 
-### Catalog Seed Command
+### Pokemon Cards Dataset Import Command
 
 Command:
 
 ```bash
-python manage.py seed_catalog
+python manage.py import_pokemon_cards_dataset
 ```
+
+Default source:
+
+- `original_datasets/pokemon-cards/pokemon-cards.csv`
+
+Default import scope:
+
+- Source CSV `set_name`: `Base`
+  - Stored catalog set name: `Base Set`
+  - Stored catalog set code: `BASE`
+  - Collector number denominator: `102`
+- Source CSV `set_name`: `Jungle`
+  - Stored catalog set name: `Jungle`
+  - Stored catalog set code: `JUNGLE`
+  - Collector number denominator: `64`
 
 Purpose:
 
-- Load a small coherent catalog dataset for development and demos.
-- Prove the catalog relationships work with real rows.
-- Make local setup easier before inventory and marketplace features exist.
+- Import the downloaded Pokemon card dataset into the catalog as ownable card variants.
+- Start with the available Base and Jungle Pokemon cards from the downloaded CSV.
+- Avoid duplicate catalog rows when the command is rerun.
 
-Seeded data:
+Important mapping:
 
-- 1 game: Pokemon
-- 1 set: Base Set
-- 2 cards: Charizard and Blastoise
-- 3 variants:
-  - Charizard Base Set 4/102 Holo English
-  - Charizard Base Set 4/102 Holo Japanese
-  - Blastoise Base Set 2/102 Holo English
-- 3 images, one per variant
+- `CardGame` is `Pokemon`.
+- `CardSet` is chosen from the supported import set mapping.
+- `Card.name` comes from CSV `name`.
+- `Card.hp` comes from CSV `hp`.
+- `Card.description` stores the CSV `caption`.
+- `Card.subtype` is parsed from caption text like `of type Fire`.
+- `CardVariant.collector_number` is parsed from CSV id, for example `base1-4` becomes `4/102` and `base2-4` becomes `4/64`.
+- `CardVariant.rarity` is parsed from caption rarity text.
+- `CardVariant.finish` is `HOLO` when the caption rarity contains `Holo`; otherwise it is `NORMAL`.
+- `CardVariant.language` is `en`.
+- `CardVariant.current_value` starts at `0.00`.
+- `CardImage.image_url` comes from CSV `image_url`.
 
 Important behavior:
 
-- The command uses `update_or_create`, so running it multiple times updates the same rows instead of creating duplicates.
-- The command is tested by `SeedCatalogCommandTests`.
+- The command uses `update_or_create` for game, set, cards, variants, and images.
+- Running it repeatedly updates existing rows instead of creating duplicates.
+- The current downloaded CSV has 69 rows where `set_name` is `Base` and 63 rows where `set_name` is `Jungle`.
+- The default import currently loads 132 ownable variants from those two sets.
+- This is still a partial classic catalog because the Base import does not include Trainer/Energy cards.
+- The command is tested by `ImportPokemonCardsDatasetCommandTests`.
 
 ## Catalog Read API
 
@@ -352,7 +375,7 @@ Serializers live in `catalog/serializers.py`.
 
 Views live in `catalog/views.py`.
 
-- `CardListView` lists cards and supports filters.
+- `CardListView` lists cards, supports filters, and uses page-number pagination.
 - `CardDetailView` returns one card with its variants.
 - `CardVariantDetailView` returns one exact card variant with its image.
 - `CardSetListView` lists catalog sets.
@@ -365,6 +388,8 @@ Views live in `catalog/views.py`.
 - `game`: filters by `CardGame.slug`.
 - `set`: filters by `CardSet.code`.
 - `rarity`: filters by `CardVariant.rarity`.
+- `page`: page number for result pagination.
+- `page_size`: page size for result pagination, capped at 100.
 
 Example:
 
@@ -379,7 +404,8 @@ GET /api/catalog/cards/?rarity=RARE
 
 - `select_related("game")` is used where the related object is a single foreign-key row.
 - `prefetch_related("variants__set__game")` is used for card detail because one card can have many variants.
-- The card list endpoint is tested to use a fixed query count for seeded data.
+- The card list endpoint returns `count`, `next`, `previous`, and `results` so clients do not need to load the whole catalog.
+- The card list endpoint is tested to use a fixed query count for representative fixture data.
 
 ## Inventory
 
@@ -1275,7 +1301,7 @@ Current test tools:
 
 High-risk behavior covered:
 
-- Catalog uniqueness, variant/image relationships, seeded catalog data, and read API filters.
+- Catalog uniqueness, variant/image relationships, dataset import behavior, paginated list responses, and read API filters.
 - Inventory ownership, quantity constraints, reserved quantity, service mutations, history writing, and authenticated API isolation.
 - Marketplace listing creation, listing state transitions, order constraints, purchase transaction behavior, order history reads, and buy endpoint behavior.
 - Pricing snapshots, current value recalculation, price history ordering, and authenticated collection valuation.

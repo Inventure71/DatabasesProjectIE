@@ -267,11 +267,8 @@ Current status:
 - [x] Created and applied `catalog.0003_remove_cardimage_is_primary`
 - [x] Verified on 2026-04-20 that creating a duplicate `CardImage` for the same `CardVariant` raises `IntegrityError`
 - [x] Verified on 2026-04-20 that `python manage.py test catalog`, `python manage.py test users`, `python manage.py test common`, `python manage.py check`, `python manage.py makemigrations --check --dry-run`, and `python manage.py migrate --check` pass after enforcing the rule
-- [x] Implemented repeatable `seed_catalog` management command
-- [x] Seed command creates 1 game, 1 set, 2 cards, 3 variants, and 3 images
-- [x] Verified on 2026-04-20 that running `python manage.py seed_catalog` twice does not duplicate catalog rows
-- [x] Verified on 2026-04-20 that seeded variants reference the expected game, set, cards, and one-to-one images
-- [x] Verified on 2026-04-20 that the development database has 1 game, 1 set, 2 cards, 3 variants, and 3 images after seeding
+- [x] Removed the old `seed_catalog` sample command so development data comes from the real dataset import path
+- [x] Kept catalog tests independent from sample seed data by creating explicit test fixtures
 
 ## Phase 5: Catalog Read API
 
@@ -309,6 +306,7 @@ Current status:
 - [x] Implemented `GET /api/catalog/variants/<id>/`
 - [x] Implemented `GET /api/catalog/sets/`
 - [x] Implemented card filters for `name`, `game`, `set`, and `rarity`
+- [x] Added page-number pagination for `GET /api/catalog/cards/`
 - [x] Ordered card list by card name and set list by game/name
 - [x] Used `select_related` and `prefetch_related` for catalog read queries
 - [x] Verified on 2026-04-20 that new API tests first failed because catalog routes were missing
@@ -765,7 +763,7 @@ Steps:
 - [x] If included, add authenticated collection valuation endpoint
 
 Verification:
-- [x] Price history endpoint works for seeded data
+- [x] Price history endpoint works for representative catalog data
 - [x] Collection valuation is correct if implemented
 
 Current status:
@@ -866,8 +864,11 @@ Goal:
 - Create real repeatable data once the dataset shape is decided
 
 Deferred steps:
-- [ ] Create a repeatable seed command, fixture strategy, or dataset import pipeline
-- [ ] Seed or import:
+- [x] Create a repeatable dataset import command for the downloaded Pokemon cards CSV
+- [x] Import available Base Set and Jungle Pokemon cards as ownable catalog variants
+- [x] Avoid duplicate catalog rows when the import command is rerun
+- [ ] Expand the dataset import later when we choose the source for missing Trainer/Energy cards
+- [ ] Seed or import later:
   - users
   - cards
   - variants
@@ -876,7 +877,8 @@ Deferred steps:
   - price snapshots
 
 Deferred verification:
-- [ ] Fresh setup can load the dataset successfully
+- [x] Fresh setup can load the partial Base Set and Jungle card dataset successfully
+- [x] Running the partial Base Set and Jungle import twice does not duplicate imported rows
 - [ ] Demo flows work on loaded dataset
 
 ## Phase 18: Optional Similarity Module

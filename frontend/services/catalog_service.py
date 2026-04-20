@@ -1,8 +1,12 @@
+from django.core.paginator import Paginator
+
 from catalog.models import Card, CardGame, CardSet, CardVariant
 from marketplace.models import MarketListing
 from pricing.models import PriceSnapshot
 
 RARITIES = [choice[0] for choice in CardVariant.Rarity.choices]
+DEFAULT_PAGE_SIZE = 24
+MAX_PAGE_SIZE = 100
 
 
 def _getlist(params, name):
@@ -22,7 +26,33 @@ def _maximum_price(params):
     return raw_value if raw_value else None
 
 
-def list_cards(params):
+def list_cards(params, *, limit=None):
+    queryset = _filter_and_sort_display_variants(params)
+    if limit is not None:
+        queryset = queryset[:limit]
+    return [_variant_to_frontend_card(variant) for variant in queryset]
+
+
+def list_card_page(params):
+    page_size = _positive_int(params.get("page_size"), DEFAULT_PAGE_SIZE)
+    page_size = min(page_size, MAX_PAGE_SIZE)
+    paginator = Paginator(_filter_and_sort_display_variants(params), page_size)
+    page_obj = paginator.get_page(params.get("page"))
+
+    return {
+        "results": [_variant_to_frontend_card(variant) for variant in page_obj.object_list],
+        "count": paginator.count,
+        "page": page_obj.number,
+        "page_size": page_size,
+        "num_pages": paginator.num_pages,
+        "has_previous": page_obj.has_previous(),
+        "has_next": page_obj.has_next(),
+        "previous_page_number": page_obj.previous_page_number() if page_obj.has_previous() else None,
+        "next_page_number": page_obj.next_page_number() if page_obj.has_next() else None,
+    }
+
+
+def _filter_and_sort_display_variants(params):
     queryset = _display_variant_queryset()
     query = params.get("q", "").strip()
     game = params.get("game", "")
@@ -57,7 +87,7 @@ def list_cards(params):
     else:
         queryset = queryset.order_by("card__name", "set__name", "collector_number", "id")
 
-    return [_variant_to_frontend_card(variant) for variant in queryset]
+    return queryset
 
 
 def get_card(card_id):
@@ -148,6 +178,14 @@ def build_price_history(card):
 
 def _display_variant_queryset():
     return CardVariant.objects.select_related("card__game", "set", "image")
+
+
+def _positive_int(raw_value, default):
+    try:
+        value = int(raw_value)
+    except (TypeError, ValueError):
+        return default
+    return value if value > 0 else default
 
 
 def _first_display_variant(card):

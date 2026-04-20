@@ -1,10 +1,8 @@
 from decimal import Decimal
-from io import StringIO
 
 from django.contrib import admin
 from django.contrib.auth import get_user_model
 from django.core.exceptions import ValidationError
-from django.core.management import call_command
 from django.db import IntegrityError, transaction
 from django.test import TestCase
 from django.urls import reverse
@@ -352,7 +350,17 @@ class InventoryAdminTests(TestCase):
 class InventoryApiTests(APITestCase):
     @classmethod
     def setUpTestData(cls):
-        call_command("seed_catalog", stdout=StringIO())
+        game = CardGame.objects.create(name="Inventory API TCG", slug="inventory-api-tcg")
+        card_set = CardSet.objects.create(game=game, name="Inventory API Set", code="INVAPI")
+        card = Card.objects.create(game=game, name="Inventory API Dragon")
+        cls.variant = CardVariant.objects.create(
+            card=card,
+            set=card_set,
+            collector_number="1/99",
+            rarity=CardVariant.Rarity.RARE,
+            finish=CardVariant.Finish.HOLO,
+            language="en",
+        )
 
     def setUp(self):
         self.owner = get_user_model().objects.create_user(
@@ -363,7 +371,7 @@ class InventoryApiTests(APITestCase):
             username="other-api",
             password="test-password",
         )
-        self.variant = CardVariant.objects.get(card__name="Charizard", language="en")
+        self.variant = self.__class__.variant
 
     def test_anonymous_user_cannot_list_inventory(self):
         response = self.client.get(reverse("inventory-my-list"))
@@ -390,7 +398,7 @@ class InventoryApiTests(APITestCase):
         self.assertEqual(response.status_code, status.HTTP_200_OK)
         self.assertEqual(len(response.data), 1)
         self.assertEqual(response.data[0]["id"], own_item.id)
-        self.assertEqual(response.data[0]["card_variant"]["card"]["name"], "Charizard")
+        self.assertEqual(response.data[0]["card_variant"]["card"]["name"], "Inventory API Dragon")
         self.assertEqual(response.data[0]["available_quantity"], 2)
 
     def test_add_inventory_endpoint_uses_service_and_writes_history(self):

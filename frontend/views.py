@@ -2,6 +2,7 @@ from django.contrib.auth import login, logout
 from django.contrib.auth.forms import AuthenticationForm, UserCreationForm
 from django.core.exceptions import ValidationError
 from django.shortcuts import redirect, render
+from django.views.decorators.http import require_POST
 
 from frontend.services.backend_api import buy_marketplace_listing
 from frontend.services.catalog_service import (
@@ -9,6 +10,7 @@ from frontend.services.catalog_service import (
     get_card,
     get_card_facets,
     list_active_listings_for_card,
+    list_card_page,
     list_cards,
     list_similar_cards,
 )
@@ -24,20 +26,26 @@ def home(request):
         request,
         "home.html",
         {
-            "featured_cards": list_cards({})[:6],
-            "latest_listings": list_listings({})[:6],
+            "featured_cards": list_cards({}, limit=6),
+            "latest_listings": list_listings({}, limit=6),
         },
     )
 
 
 def catalog(request):
     facets = get_card_facets()
+    card_page = list_card_page(request.GET)
+    pagination_query = request.GET.copy()
+    pagination_query.pop("page", None)
 
     return render(
         request,
         "catalog.html",
         {
-            "cards": list_cards(request.GET),
+            "cards": card_page["results"],
+            "result_count": card_page["count"],
+            "pagination": card_page,
+            "pagination_query": pagination_query.urlencode(),
             "total_cards": facets["total_cards"],
             "games": facets["games"],
             "sets": facets["sets"],
@@ -120,6 +128,7 @@ def listing_detail(request, listing_id):
     )
 
 
+@require_POST
 def logout_view(request):
     logout(request)
     return redirect("home")

@@ -1,7 +1,9 @@
 from decimal import Decimal
 
 from django.contrib.auth import get_user_model
+from django.db import connection
 from django.test import TestCase
+from django.test.utils import CaptureQueriesContext
 from django.urls import reverse
 
 from catalog.models import Card, CardGame, CardImage, CardSet, CardVariant
@@ -10,6 +12,40 @@ from inventory.services import add_inventory_item
 from marketplace.models import MarketListing, PurchaseOrder
 from marketplace.services import create_listing
 from pricing.services import record_price_snapshot
+
+
+class FrontendAuthFlowTests(TestCase):
+    def setUp(self):
+        self.user = get_user_model().objects.create_user(
+            username="auth-user",
+            password="auth-password",
+        )
+
+    def test_login_authenticates_session_and_navbar_posts_logout(self):
+        login_response = self.client.post(
+            reverse("login"),
+            {"username": "auth-user", "password": "auth-password"},
+        )
+
+        self.assertRedirects(login_response, reverse("home"))
+
+        current_user_response = self.client.get(reverse("users-me"))
+        self.assertEqual(current_user_response.status_code, 200)
+        self.assertEqual(current_user_response.json()["username"], "auth-user")
+
+        home_response = self.client.get(reverse("home"))
+        self.assertContains(home_response, "auth-user")
+        self.assertContains(home_response, f'action="{reverse("logout")}"')
+        self.assertContains(home_response, 'method="post"')
+
+    def test_logout_post_clears_session(self):
+        self.client.force_login(self.user)
+
+        logout_response = self.client.post(reverse("logout"))
+
+        self.assertRedirects(logout_response, reverse("home"))
+        current_user_response = self.client.get(reverse("users-me"))
+        self.assertEqual(current_user_response.status_code, 403)
 
 
 class FrontendBackendApiWiringTests(TestCase):
@@ -63,6 +99,48 @@ class FrontendBackendApiWiringTests(TestCase):
         self.assertContains(response, "Backend Dragon")
         self.assertContains(response, "Backend Set")
         self.assertContains(response, "42.50")
+
+    def test_catalog_page_paginates_card_results_in_database(self):
+        for index in range(1, 13):
+            card = Card.objects.create(
+                game=self.game,
+                name=f"Catalog Page {index:02d}",
+            )
+            CardVariant.objects.create(
+                card=card,
+                set=self.card_set,
+                collector_number=f"{index + 1}/99",
+            )
+
+        with CaptureQueriesContext(connection) as queries:
+            response = self.client.get(reverse("catalog"), {"page": "2", "page_size": "5"})
+
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, "Catalog Page 05")
+        self.assertContains(response, "Page 2 of 3")
+        self.assertNotContains(response, "Catalog Page 10")
+        self.assertTrue(
+            any("LIMIT 5" in query["sql"].upper() for query in queries.captured_queries),
+            "Expected the catalog query to apply the page size in SQL.",
+        )
+
+    def test_home_search_form_submits_to_catalog_search(self):
+        response = self.client.get(reverse("home"))
+
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, f'action="{reverse("catalog")}"')
+
+    def test_home_page_limits_featured_queries_in_database(self):
+        with CaptureQueriesContext(connection) as queries:
+            response = self.client.get(reverse("home"))
+
+        self.assertEqual(response.status_code, 200)
+        limited_queries = [
+            query["sql"]
+            for query in queries.captured_queries
+            if "LIMIT 6" in query["sql"].upper()
+        ]
+        self.assertGreaterEqual(len(limited_queries), 2)
 
     def test_marketplace_page_uses_real_backend_listing_data(self):
         response = self.client.get(reverse("listings"), {"q": "Backend Dragon"})

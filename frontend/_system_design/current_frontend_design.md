@@ -31,6 +31,8 @@ business rules exposed by `/api/...`.
 Current backend wiring:
 
 - Catalog pages read real `Card`, `CardVariant`, `CardSet`, and `CardImage` data.
+- Catalog pages request paginated service results so large catalogs are sliced by the database before template rendering.
+- The home page requests only the featured cards and latest listings it displays instead of loading every row first.
 - Marketplace pages read real active `MarketListing` data.
 - Card detail pages read real active listings and `PriceSnapshot` history.
 - Listing detail purchases call the backend marketplace purchase workflow.
@@ -41,6 +43,7 @@ Current backend wiring:
 Current frontend UI boundary:
 
 - Catalog/listing/home/detail pages are wired to real backend data.
+- The home search form submits to `/catalog/` with the `q` query parameter, so search uses the catalog filtering path.
 - Inventory, purchase history, sales history, and account/profile pages do not
   have full frontend templates yet.
 - The service functions for those authenticated APIs exist before the templates

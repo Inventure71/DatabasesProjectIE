@@ -129,7 +129,7 @@
         <!-- Sort + count bar -->
         <div class="catalog-bar">
             <span class="catalog-bar__count">
-                {% if cards %}{{ cards|length }} result{% if cards|length != 1 %}s{% endif %}{% else %}No results{% endif %}
+                {% if result_count %}{{ result_count }} result{% if result_count != 1 %}s{% endif %}{% else %}No results{% endif %}
             </span>
             <div class="catalog-bar__sort">
                 <label class="filter-label" style="margin:0">Sort by</label>
@@ -154,6 +154,30 @@
                 </div>
             {% endfor %}
         </div>
+
+        {% if pagination.num_pages > 1 %}
+            <nav class="pagination" aria-label="Catalog pages">
+                {% if pagination.has_previous %}
+                    <a
+                        class="btn btn-outline-gold btn-sm"
+                        href="{% if pagination_query %}?{{ pagination_query }}&page={{ pagination.previous_page_number }}{% else %}?page={{ pagination.previous_page_number }}{% endif %}"
+                    >
+                        Previous
+                    </a>
+                {% endif %}
+
+                <span class="pagination__status">Page {{ pagination.page }} of {{ pagination.num_pages }}</span>
+
+                {% if pagination.has_next %}
+                    <a
+                        class="btn btn-outline-gold btn-sm"
+                        href="{% if pagination_query %}?{{ pagination_query }}&page={{ pagination.next_page_number }}{% else %}?page={{ pagination.next_page_number }}{% endif %}"
+                    >
+                        Next
+                    </a>
+                {% endif %}
+            </nav>
+        {% endif %}
  
     </div>
 </div>

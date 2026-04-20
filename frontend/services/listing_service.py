@@ -4,7 +4,7 @@ from marketplace.models import MarketListing
 from .catalog_service import RARITIES, _getlist, _maximum_price, _minimum_price, _variant_to_frontend_card
 
 
-def list_listings(params):
+def list_listings(params, *, limit=None):
     listings = _active_listing_queryset()
     query = params.get("q", "").strip()
     game = params.get("game", "")
@@ -32,6 +32,9 @@ def list_listings(params):
         listings = listings.order_by("inventory_item__card_variant__card__name", "id")
     else:
         listings = listings.order_by("-created_at", "id")
+
+    if limit is not None:
+        listings = listings[:limit]
 
     return [_listing_to_frontend_listing(listing) for listing in listings]
 

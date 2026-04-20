@@ -58,13 +58,13 @@ source .venv/bin/activate
 python manage.py test common catalog users inventory marketplace pricing
 ```
 
-## Seed Catalog Data
+## Import Catalog Data
 
-After migrations have run, load the development catalog sample:
+After migrations have run, import the downloaded Pokemon card dataset:
 
 ```bash
 source .venv/bin/activate
-python manage.py seed_catalog
+python manage.py import_pokemon_cards_dataset
 ```
 
-The command is repeatable. Running it again updates the same sample rows instead of duplicating them.
+The command is repeatable. Running it again updates the same imported rows instead of duplicating them.

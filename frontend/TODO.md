@@ -10,8 +10,12 @@ This file tracks frontend work now that `frontend/` is a sibling Django app.
 - [x] Mock JSON endpoints mounted under `/mock-api/`
 - [x] Real backend APIs remain reserved under `/api/`
 - [x] Catalog and marketplace pages now read real backend-backed data through frontend services
+- [x] Home search submits to catalog filtering instead of staying on the home page
+- [x] Catalog page results are paginated so large card sets are sliced by the database
+- [x] Home featured cards and latest listings are limited in the database before rendering
 - [x] Listing detail buy form now uses the backend purchase workflow
 - [x] Authenticated backend API wrappers exist for user, inventory, order history, and collection valuation
+- [x] Login creates a Django session and the navbar logout form clears it through a CSRF-protected POST
 
 ## Working Rules
 
@@ -33,5 +37,6 @@ This file tracks frontend work now that `frontend/` is a sibling Django app.
 - [x] Keep similar-card UI backend-backed by catalog metadata only; full similarity remains optional later work.
 - [ ] Add mock API endpoints only when frontend JavaScript needs JSON.
 - [x] Add tests for current frontend/backend wiring.
+- [x] Add regression tests for login session creation and navbar logout behavior.
 - [x] Verified frontend/backend wiring with `python manage.py test common.test_frontend_integration frontend`.
 - [x] Verified full project checks with `python manage.py check`, `python manage.py makemigrations --check --dry-run`, `python manage.py migrate --check`, and `python manage.py test common catalog users inventory marketplace pricing frontend`.
