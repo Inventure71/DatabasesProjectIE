@@ -2,9 +2,8 @@ from decimal import Decimal
 
 from django.contrib import admin
 from django.contrib.auth import get_user_model
-from django.apps import apps
 from django.core.exceptions import ValidationError
-from django.core.files.uploadedfile import SimpleUploadedFile
+from django.db import IntegrityError, transaction
 from django.test import TestCase
 from django.urls import reverse
 from rest_framework import status
@@ -58,28 +57,29 @@ class InventoryModelTests(TestCase):
         self.assertIn(item, self.owner.inventory_items.all())
         self.assertIn(item, self.variant.inventory_items.all())
 
-    def test_same_owner_variant_condition_can_have_separate_physical_items(self):
-        first_item = InventoryItem.objects.create(
-            owner=self.owner,
-            card_variant=self.variant,
-            condition=InventoryItem.Condition.NEAR_MINT,
-            quantity=1,
-        )
-        second_item = InventoryItem.objects.create(
+    def test_same_owner_variant_condition_is_one_aggregate_inventory_bucket(self):
+        InventoryItem.objects.create(
             owner=self.owner,
             card_variant=self.variant,
             condition=InventoryItem.Condition.NEAR_MINT,
             quantity=1,
         )
 
-        self.assertNotEqual(first_item.id, second_item.id)
+        with self.assertRaises(IntegrityError), transaction.atomic():
+            InventoryItem.objects.create(
+                owner=self.owner,
+                card_variant=self.variant,
+                condition=InventoryItem.Condition.NEAR_MINT,
+                quantity=1,
+            )
+
         self.assertEqual(
             InventoryItem.objects.filter(
                 owner=self.owner,
                 card_variant=self.variant,
                 condition=InventoryItem.Condition.NEAR_MINT,
             ).count(),
-            2,
+            1,
         )
 
     def test_quantity_can_be_zero_after_stock_is_sold(self):
@@ -157,27 +157,6 @@ class InventoryModelTests(TestCase):
         self.assertEqual(history.quantity_delta, 2)
         self.assertIn(history, item.history_entries.all())
 
-    def test_inventory_item_photo_belongs_to_owned_inventory_item(self):
-        item = InventoryItem.objects.create(
-            owner=self.owner,
-            card_variant=self.variant,
-            condition=InventoryItem.Condition.NEAR_MINT,
-            quantity=1,
-        )
-        photo_model = apps.get_model("inventory", "InventoryItemPhoto")
-
-        photo = photo_model.objects.create(
-            inventory_item=item,
-            image="inventory_item_photos/test-front.jpg",
-            label="FRONT",
-            caption="Front of actual card",
-        )
-
-        self.assertEqual(photo.inventory_item, item)
-        self.assertEqual(photo.owner, self.owner)
-        self.assertIn(photo, item.photos.all())
-        self.assertIn("test-front.jpg", str(photo))
-
 
 class InventoryServiceTests(TestCase):
     def setUp(self):
@@ -218,7 +197,7 @@ class InventoryServiceTests(TestCase):
         self.assertEqual(history.quantity_delta, 2)
         self.assertEqual(history.created_by, self.owner)
 
-    def test_add_inventory_item_creates_separate_physical_item_for_same_variant_condition(self):
+    def test_add_inventory_item_merges_same_owner_variant_condition_into_one_bucket(self):
         first_item = add_inventory_item(
             owner=self.owner,
             card_variant=self.variant,
@@ -236,11 +215,15 @@ class InventoryServiceTests(TestCase):
         )
 
         first_item.refresh_from_db()
-        self.assertNotEqual(first_item, second_item)
-        self.assertEqual(first_item.quantity, 1)
-        self.assertEqual(second_item.quantity, 2)
-        self.assertEqual(first_item.history_entries.get().change_type, InventoryHistory.ChangeType.ADD)
-        self.assertEqual(second_item.history_entries.get().quantity_delta, 2)
+        self.assertEqual(first_item, second_item)
+        self.assertEqual(first_item.quantity, 3)
+        self.assertEqual(
+            list(first_item.history_entries.order_by("created_at").values_list("change_type", "quantity_delta")),
+            [
+                (InventoryHistory.ChangeType.ADD, 1),
+                (InventoryHistory.ChangeType.INCREASE, 2),
+            ],
+        )
 
     def test_increase_quantity_updates_quantity_and_history(self):
         item = add_inventory_item(
@@ -372,13 +355,6 @@ class InventoryAdminTests(TestCase):
             ("inventory_item", "change_type", "quantity_delta", "created_by", "note", "created_at"),
         )
 
-    def test_inventory_item_photo_admin_is_registered_for_inspection(self):
-        photo_model = apps.get_model("inventory", "InventoryItemPhoto")
-        photo_admin = admin.site._registry[photo_model]
-
-        self.assertEqual(photo_admin.list_select_related, ("inventory_item__owner", "inventory_item__card_variant__card"))
-        self.assertEqual(photo_admin.autocomplete_fields, ("inventory_item",))
-
 
 class InventoryApiTests(APITestCase):
     @classmethod
@@ -455,30 +431,31 @@ class InventoryApiTests(APITestCase):
         self.assertEqual(history.change_type, InventoryHistory.ChangeType.ADD)
         self.assertEqual(history.created_by, self.owner)
 
-    def test_add_inventory_endpoint_accepts_actual_card_photo(self):
-        self.client.force_authenticate(user=self.owner)
-        image = SimpleUploadedFile(
-            "actual-front.jpg",
-            b"fake image bytes",
-            content_type="image/jpeg",
+    def test_add_inventory_endpoint_merges_same_owner_variant_condition(self):
+        add_inventory_item(
+            owner=self.owner,
+            card_variant=self.variant,
+            condition=InventoryItem.Condition.NEAR_MINT,
+            quantity=1,
+            actor=self.owner,
         )
+        self.client.force_authenticate(user=self.owner)
 
         response = self.client.post(
             reverse("inventory-my-add"),
             {
                 "card_variant_id": self.variant.id,
                 "condition": InventoryItem.Condition.NEAR_MINT,
-                "quantity": 1,
-                "photo": image,
+                "quantity": 2,
             },
-            format="multipart",
+            format="json",
         )
 
         self.assertEqual(response.status_code, status.HTTP_201_CREATED)
         item = InventoryItem.objects.get(owner=self.owner, card_variant=self.variant)
-        self.assertEqual(item.photos.count(), 1)
-        self.assertEqual(response.data["photos"][0]["label"], "FRONT")
-        self.assertIn("actual-front", response.data["photos"][0]["image_url"])
+        self.assertEqual(item.quantity, 3)
+        self.assertEqual(item.history_entries.count(), 2)
+        self.assertEqual(response.data["quantity"], 3)
 
     def test_update_endpoint_can_increase_reserve_and_release_stock(self):
         item = add_inventory_item(

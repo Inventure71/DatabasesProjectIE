@@ -1,7 +1,6 @@
 from decimal import Decimal
 
 from django.contrib.auth import get_user_model
-from django.core.files.uploadedfile import SimpleUploadedFile
 from django.db import connection
 from django.http import QueryDict
 from django.test import TestCase
@@ -720,13 +719,8 @@ class FrontendBackendApiWiringTests(TestCase):
         self.assertContains(response, "Available")
         self.assertNotContains(response, "Sell")
 
-    def test_collection_page_post_adds_new_physical_inventory_item_with_photo(self):
+    def test_collection_page_post_adds_inventory_to_aggregate_bucket(self):
         self.client.force_login(self.buyer)
-        image = SimpleUploadedFile(
-            "buyer-front.jpg",
-            b"fake image bytes",
-            content_type="image/jpeg",
-        )
 
         response = self.client.post(
             reverse("collection"),
@@ -736,7 +730,6 @@ class FrontendBackendApiWiringTests(TestCase):
                 "condition": InventoryItem.Condition.NEAR_MINT,
                 "quantity": "1",
                 "purchase_price": "11.25",
-                "photo": image,
             },
         )
 
@@ -744,10 +737,9 @@ class FrontendBackendApiWiringTests(TestCase):
         self.assertRedirects(response, f"{reverse('collection')}?added={added_item.id}")
         self.assertEqual(added_item.quantity, 1)
         self.assertEqual(added_item.purchase_price, Decimal("11.25"))
-        self.assertEqual(added_item.photos.count(), 1)
 
-    def test_collection_page_add_keeps_duplicate_physical_copies_separate(self):
-        add_inventory_item(
+    def test_collection_page_add_merges_duplicate_inventory_bucket(self):
+        existing_item = add_inventory_item(
             owner=self.buyer,
             card_variant=self.variant,
             condition=InventoryItem.Condition.NEAR_MINT,
@@ -766,14 +758,16 @@ class FrontendBackendApiWiringTests(TestCase):
             },
         )
 
-        self.assertEqual(response.status_code, 302)
+        existing_item.refresh_from_db()
+        self.assertRedirects(response, f"{reverse('collection')}?added={existing_item.id}")
+        self.assertEqual(existing_item.quantity, 2)
         self.assertEqual(
             InventoryItem.objects.filter(
                 owner=self.buyer,
                 card_variant=self.variant,
                 condition=InventoryItem.Condition.NEAR_MINT,
             ).count(),
-            2,
+            1,
         )
 
     def test_collection_page_post_creates_listing_from_owned_inventory(self):

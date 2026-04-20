@@ -40,6 +40,7 @@ Current backend wiring:
 - Card detail pages read real active listings and `PriceSnapshot` history.
 - Listing detail purchases call the backend marketplace purchase workflow.
 - The collection page reads authenticated inventory and collection valuation data through `frontend.services.backend_api`.
+- The collection add-inventory POST flow uses the backend aggregate inventory service. Adding the same card variant in the same condition increases the existing inventory quantity instead of creating a separate physical-copy row.
 - Collection sell forms call the marketplace listing service through `create_marketplace_listing_for_user`, so stock reservation and ownership validation stay in the backend service layer.
 - The legacy `/listings/` route is retained as a compatibility entry point, but
   it redirects to `/catalog/?available=1#browser` instead of rendering a

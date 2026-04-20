@@ -45,7 +45,7 @@ Steps:
   - Buying flow
   - Price history
   - Exclude similarity from the first working MVP if time gets tight
-- [ ] Define the key invariant for stock:
+- [x] Define the key invariant for stock:
   - A listing can only sell cards the seller actually owns
   - Stock updates must happen inside a transaction
   - Reserved quantity rules must be explicit
@@ -57,7 +57,8 @@ Current status:
 - [x] Confirmed backend stack and implemented project foundation with Django, Django REST Framework, MySQL, and Django built-in auth
 - [x] Confirmed backend app boundaries: `common`, `users`, `catalog`, `inventory`, `marketplace`, and `pricing`
 - [x] Confirmed similarity is optional later work and not part of the first transactional marketplace slice
-- [ ] Reserved quantity behavior still needs a precise rule before listing services are implemented
+- [x] Inventory uses an aggregate stock rule: one row per owner, card variant, and condition; duplicate additions increase quantity on that row.
+- [x] Listing creation reserves quantity from aggregate inventory, and purchase/cancel flows update reserved stock transactionally.
 
 ## Phase 1: Backend Foundation
 
@@ -105,6 +106,7 @@ Current status:
 - [x] Moved Django command entrypoint to repository-root `manage.py` so `backend/` and `frontend/` can be sibling folders
 - [x] Verified on 2026-04-20 that root `python manage.py check` passes with no issues
 - [x] Verified on 2026-04-20 that `python manage.py test common catalog users inventory marketplace pricing` runs 46 tests successfully
+- [x] Verified on 2026-04-20 that the broader suite `python manage.py test common catalog users inventory marketplace pricing frontend --keepdb` runs 148 tests successfully after choosing the aggregate inventory model.
 - [x] Verified that Django apps exist under `backend/`
 - [x] Verified that `requirements.txt` includes Django, Django REST Framework, MySQL client, and python-dotenv
 - [x] Verified on 2026-04-20 that `.env` exists with the expected keys

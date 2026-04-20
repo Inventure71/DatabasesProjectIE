@@ -454,6 +454,7 @@ Why the uniqueness rule exists:
 
 - If one user owns the same variant in the same condition multiple times, we merge that into one row and increase `quantity`.
 - If the condition differs, it gets a separate row because condition changes sale value.
+- The project intentionally uses aggregate inventory buckets, not per-physical-copy rows. Per-copy photos, certificates, or serial numbers would require a separate copy-level model and are outside the current design.
 
 ### `inventory.models.InventoryHistory`
 

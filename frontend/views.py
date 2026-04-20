@@ -16,6 +16,7 @@ from frontend.services.album_service import (
     resolve_browser_view,
 )
 from frontend.services.backend_api import (
+    add_inventory_item_for_user,
     buy_marketplace_listing,
     create_marketplace_listing_for_user,
     get_collection_value,
@@ -156,24 +157,45 @@ def collection(request):
     error = None
 
     if request.method == "POST":
-        try:
-            inventory_item_id = int(request.POST.get("inventory_item_id", ""))
-            quantity = int(request.POST.get("quantity", ""))
-            unit_price = Decimal(request.POST.get("unit_price", ""))
-        except (TypeError, ValueError, InvalidOperation):
-            error = "Enter a valid quantity and price."
+        if request.POST.get("form_action") == "add_inventory":
+            try:
+                card_variant_id = int(request.POST.get("card_variant_id", ""))
+                quantity = int(request.POST.get("quantity", ""))
+                purchase_price = _optional_decimal(request.POST.get("purchase_price", ""))
+            except (TypeError, ValueError, InvalidOperation):
+                error = "Enter a valid card, quantity, and purchase price."
+            else:
+                try:
+                    item = add_inventory_item_for_user(
+                        user=request.user,
+                        card_variant_id=card_variant_id,
+                        condition=request.POST.get("condition", ""),
+                        quantity=quantity,
+                        purchase_price=purchase_price,
+                    )
+                except ValidationError as exc:
+                    error = "; ".join(exc.messages)
+                else:
+                    return redirect(f"{reverse('collection')}?added={item['id']}")
         else:
             try:
-                listing = create_marketplace_listing_for_user(
-                    user=request.user,
-                    inventory_item_id=inventory_item_id,
-                    quantity=quantity,
-                    unit_price=unit_price,
-                )
-            except ValidationError as exc:
-                error = "; ".join(exc.messages)
+                inventory_item_id = int(request.POST.get("inventory_item_id", ""))
+                quantity = int(request.POST.get("quantity", ""))
+                unit_price = Decimal(request.POST.get("unit_price", ""))
+            except (TypeError, ValueError, InvalidOperation):
+                error = "Enter a valid quantity and price."
             else:
-                return redirect(f"{reverse('collection')}?listed={listing['id']}")
+                try:
+                    listing = create_marketplace_listing_for_user(
+                        user=request.user,
+                        inventory_item_id=inventory_item_id,
+                        quantity=quantity,
+                        unit_price=unit_price,
+                    )
+                except ValidationError as exc:
+                    error = "; ".join(exc.messages)
+                else:
+                    return redirect(f"{reverse('collection')}?listed={listing['id']}")
 
     inventory_items = list_my_inventory(request.user)
     collection_value = get_collection_value(request.user)
@@ -282,3 +304,8 @@ def login_view(request):
         form = AuthenticationForm()
 
     return render(request, "login.html", {"form": form})
+
+
+def _optional_decimal(value):
+    value = value.strip() if value else ""
+    return Decimal(value) if value else None

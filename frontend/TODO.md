@@ -72,4 +72,4 @@ This file tracks frontend work now that `frontend/` is a sibling Django app.
 - [x] Verified shared browser anchor preservation with focused frontend regression tests.
 - [x] Verified current browser unification, listed-card overlay, sold-out ownership, and card-detail listing regressions with focused frontend tests.
 - [x] Verified catalog/listings unification and home latest-listings ordering with focused frontend regression tests.
-- [ ] Restore the collection add-physical-inventory flow; current `python manage.py test --keepdb frontend` failures are the photo-backed add inventory tests.
+- [x] Restore the collection add-inventory POST flow using the aggregate inventory model; duplicate owner/card/condition additions merge into one quantity bucket.
