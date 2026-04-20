@@ -1,0 +1,29 @@
+<!-- templates/components/listing_item.html -->
+<div class="listing-card">
+
+    <div class="listing-card__image-wrap">
+        {% if listing.card.image_url %}
+            <img src="{{ listing.card.image_url }}" alt="{{ listing.card.name }}">
+        {% else %}
+            <div class="listing-card__image-placeholder">🃏</div>
+        {% endif %}
+    </div>
+
+    <div class="listing-card__body">
+        <div class="listing-card__name">{{ listing.card.name }}</div>
+
+        <div class="listing-card__price-row">
+            <span class="listing-card__price">${{ listing.price_per_unit }}</span>
+            <span class="listing-card__qty">× {{ listing.quantity }} available</span>
+        </div>
+
+        <div class="listing-card__seller">
+            <span>Sold by</span> {{ listing.seller.username }}
+        </div>
+    </div>
+
+    <div class="listing-card__footer">
+        <a class="btn btn-outline-gold btn-sm">View Listing</a>
+    </div>
+
+</div>

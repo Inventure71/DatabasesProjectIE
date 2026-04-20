@@ -1,0 +1,168 @@
+{% extends "base.html" %}
+{% load static %}
+ 
+{% block title %}{{ card.name }} — Card Marketplace{% endblock %}
+ 
+{% block content %}
+ 
+<!-- BACK LINK -->
+<div class="detail-back">
+    <a href="{% url 'catalog' %}" class="detail-back__link">← Back to Catalog</a>
+</div>
+ 
+<!-- HERO SECTION -->
+<div class="detail-hero">
+ 
+    <!-- LEFT: Image -->
+    <div class="detail-image-wrap">
+        {% if card.image_url %}
+            <img src="{{ card.image_url }}" alt="{{ card.name }}" class="detail-image">
+        {% else %}
+            <div class="detail-image-placeholder">🃏</div>
+        {% endif %}
+    </div>
+ 
+    <!-- RIGHT: Metadata -->
+    <div class="detail-meta">
+ 
+        <div class="detail-meta__eyebrow">
+            <span class="rarity-badge rarity-badge--{{ card.rarity|lower }}">{{ card.rarity }}</span>
+            <span class="detail-meta__game">{{ card.game }}</span>
+        </div>
+ 
+        <h1 class="detail-meta__title">{{ card.name }}</h1>
+ 
+        <div class="detail-meta__value">
+            <span class="detail-meta__value-label">Estimated Value</span>
+            <span class="detail-meta__value-amount">${{ card.current_value }}</span>
+        </div>
+ 
+        <div class="detail-info-grid">
+            <div class="detail-info-item">
+                <span class="detail-info-item__label">Set</span>
+                <span class="detail-info-item__value">{{ card.set_name }}</span>
+            </div>
+            <div class="detail-info-item">
+                <span class="detail-info-item__label">Language</span>
+                <span class="detail-info-item__value">{{ card.language }}</span>
+            </div>
+            <div class="detail-info-item">
+                <span class="detail-info-item__label">Rarity</span>
+                <span class="detail-info-item__value">{{ card.rarity|capfirst }}</span>
+            </div>
+            <div class="detail-info-item">
+                <span class="detail-info-item__label">Edition</span>
+                <span class="detail-info-item__value">{{ card.edition|default:"Standard" }}</span>
+            </div>
+        </div>
+ 
+        {% if user.is_authenticated %}
+            <a href="{% url 'catalog' %}" class="btn btn-gold detail-buy-btn">Browse Listings for this Card</a>
+        {% else %}
+            <a href="{% url 'login' %}" class="btn btn-outline-gold detail-buy-btn">Login to Buy</a>
+        {% endif %}
+ 
+    </div>
+</div>
+ 
+<!-- ACTIVE LISTINGS -->
+<section class="section">
+    <div class="section__header">
+        <h2 class="section__title">Active Listings</h2>
+    </div>
+ 
+    {% if active_listings %}
+        <div class="listings-table-wrap">
+            <table class="listings-table">
+                <thead>
+                    <tr>
+                        <th>Seller</th>
+                        <th>Condition</th>
+                        <th>Qty Available</th>
+                        <th>Price / Unit</th>
+                        <th></th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for listing in active_listings %}
+                    <tr>
+                        <td class="listings-table__seller">{{ listing.seller.username }}</td>
+                        <td>{{ listing.condition|default:"Near Mint" }}</td>
+                        <td>{{ listing.quantity }}</td>
+                        <td class="listings-table__price">${{ listing.price_per_unit }}</td>
+                        <td>
+                            {% if user.is_authenticated %}
+                                <a href="#" class="btn btn-gold btn-sm">Buy</a>
+                            {% else %}
+                                <a href="{% url 'login' %}" class="btn btn-outline-gold btn-sm">Login</a>
+                            {% endif %}
+                        </td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    {% else %}
+        <div class="empty-state">
+            <p style="font-size:1.5rem">📭</p>
+            <p>No active listings for this card right now.</p>
+        </div>
+    {% endif %}
+</section>
+ 
+<!-- PRICE HISTORY -->
+<section class="section">
+    <div class="section__header">
+        <h2 class="section__title">Price History</h2>
+    </div>
+ 
+    {% if price_history %}
+        <div class="listings-table-wrap">
+            <table class="listings-table">
+                <thead>
+                    <tr>
+                        <th>Date</th>
+                        <th>Price</th>
+                        <th>Source</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for snapshot in price_history %}
+                    <tr>
+                        <td>{{ snapshot.date }}</td>
+                        <td class="listings-table__price">${{ snapshot.price }}</td>
+                        <td class="listings-table__seller">{{ snapshot.source }}</td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    {% else %}
+        <div class="empty-state">
+            <p style="font-size:1.5rem">📊</p>
+            <p>No price history available yet.</p>
+        </div>
+    {% endif %}
+</section>
+ 
+<!-- SIMILAR CARDS -->
+<section class="section">
+    <div class="section__header">
+        <h2 class="section__title">Similar Cards</h2>
+    </div>
+ 
+    {% if similar_cards %}
+        <div class="card-grid">
+            {% for card in similar_cards %}
+                {% include "components/card_item.html" %}
+            {% endfor %}
+        </div>
+    {% else %}
+        <div class="empty-state">
+            <p style="font-size:1.5rem">🔍</p>
+            <p>No similar cards found.</p>
+        </div>
+    {% endif %}
+</section>
+ 
+{% endblock %}

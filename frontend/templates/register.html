@@ -1,0 +1,97 @@
+{% extends "base.html" %}
+{% load static %}
+ 
+{% block title %}Register — Card Marketplace{% endblock %}
+ 
+{% block content %}
+ 
+<section class="auth-section">
+ 
+    <div class="auth-card">
+ 
+        <div class="auth-card__header">
+            <span class="hero__eyebrow">Join the Marketplace</span>
+            <h1 class="auth-card__title">Create Account</h1>
+            <p class="auth-card__subtitle">Start buying and selling trading cards today.</p>
+        </div>
+ 
+        <form class="auth-form" method="POST" action="{% url 'register' %}">
+            {% csrf_token %}
+ 
+            {% if form.errors %}
+                <div class="auth-alert">
+                    {% for field in form %}
+                        {% for error in field.errors %}
+                            <span>{{ error }}</span><br>
+                        {% endfor %}
+                    {% endfor %}
+                    {% for error in form.non_field_errors %}
+                        <span>{{ error }}</span><br>
+                    {% endfor %}
+                </div>
+            {% endif %}
+ 
+            <div class="form-group">
+                <label class="form-label" for="id_username">Username</label>
+                <input
+                    class="form-input"
+                    type="text"
+                    id="id_username"
+                    name="username"
+                    placeholder="Choose a username"
+                    autocomplete="username"
+                    required
+                >
+            </div>
+ 
+            <div class="form-group">
+                <label class="form-label" for="id_email">Email</label>
+                <input
+                    class="form-input"
+                    type="email"
+                    id="id_email"
+                    name="email"
+                    placeholder="Enter your email"
+                    autocomplete="email"
+                >
+            </div>
+ 
+            <div class="form-group">
+                <label class="form-label" for="id_password1">Password</label>
+                <input
+                    class="form-input"
+                    type="password"
+                    id="id_password1"
+                    name="password1"
+                    placeholder="Create a password"
+                    autocomplete="new-password"
+                    required
+                >
+            </div>
+ 
+            <div class="form-group">
+                <label class="form-label" for="id_password2">Confirm Password</label>
+                <input
+                    class="form-input"
+                    type="password"
+                    id="id_password2"
+                    name="password2"
+                    placeholder="Repeat your password"
+                    autocomplete="new-password"
+                    required
+                >
+            </div>
+ 
+            <button type="submit" class="btn btn-gold auth-submit">Create Account</button>
+ 
+        </form>
+ 
+        <div class="auth-card__footer">
+            <p>Already have an account? <a href="{% url 'login' %}">Login here</a></p>
+        </div>
+ 
+    </div>
+ 
+</section>
+ 
+{% endblock %}

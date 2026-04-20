@@ -1,0 +1,18 @@
+<nav class="navbar">
+ 
+    <a href="{% url 'home' %}" class="navbar__brand">
+        <div class="navbar__brand-icon">♦</div>
+        Card Marketplace
+    </a>
+ 
+    <div class="navbar__links">
+        {% if user.is_authenticated %}
+            <span class="navbar__welcome">{{ user.username }}</span>
+            <a class="btn btn-ghost btn-sm">Logout</a>
+        {% else %}
+            <a href="{% url 'login' %}" class="btn btn-ghost btn-sm">Login</a>
+            <a href="{% url 'register' %}" class="btn btn-gold btn-sm">Register</a>
+        {% endif %}
+    </div>
+ 
+</nav>
