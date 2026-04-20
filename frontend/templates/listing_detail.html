@@ -1,181 +1,80 @@
 {% extends "base.html" %}
 {% load static %}
- 
-{% block title %}Listings — Card Marketplace{% endblock %}
- 
+
+{% block title %}{{ listing.card.name }} Listing — Card Marketplace{% endblock %}
+
 {% block content %}
- 
-<section class="page-header">
-    <h1 class="page-header__title">Marketplace Listings</h1>
-    <p class="page-header__subtitle">{{ total_listings }} active listing{{ total_listings|pluralize }} available right now.</p>
-</section>
- 
-<div class="catalog-layout">
- 
-    <!-- SIDEBAR FILTERS -->
-    <aside class="filter-sidebar">
-        <form method="GET" action="{% url 'listings' %}" id="listings-filter-form">
- 
-            <div class="filter-sidebar__header">
-                <span class="filter-sidebar__title">Filters</span>
-                <a href="{% url 'listings' %}" class="filter-clear">Clear all</a>
+
+<div class="detail-back">
+    <a href="{% url 'listings' %}" class="detail-back__link">← Back to Listings</a>
+</div>
+
+<div class="detail-hero">
+    <div class="detail-image-wrap">
+        {% if listing.card.image_url %}
+            <img src="{{ listing.card.image_url }}" alt="{{ listing.card.name }}" class="detail-image">
+        {% else %}
+            <div class="detail-image-placeholder">🃏</div>
+        {% endif %}
+    </div>
+
+    <div class="detail-meta">
+        <div class="detail-meta__eyebrow">
+            <span class="rarity-badge rarity-badge--{{ listing.card.rarity|lower }}">{{ listing.card.rarity }}</span>
+            <span class="detail-meta__game">{{ listing.card.game }}</span>
+        </div>
+
+        <h1 class="detail-meta__title">{{ listing.card.name }}</h1>
+
+        <div class="detail-meta__value">
+            <span class="detail-meta__value-label">Listing Price</span>
+            <span class="detail-meta__value-amount">${{ listing.price_per_unit }}</span>
+        </div>
+
+        <div class="detail-info-grid">
+            <div class="detail-info-item">
+                <span class="detail-info-item__label">Seller</span>
+                <span class="detail-info-item__value">{{ listing.seller.username }}</span>
             </div>
- 
-            <!-- Search -->
-            <div class="filter-group">
-                <label class="filter-label">Search</label>
-                <input
-                    class="form-input form-input--sm"
-                    type="text"
-                    name="q"
-                    placeholder="Card name…"
-                    value="{{ request.GET.q }}"
-                >
+            <div class="detail-info-item">
+                <span class="detail-info-item__label">Set</span>
+                <span class="detail-info-item__value">{{ listing.card.set_name }}</span>
             </div>
- 
-            <!-- Game -->
-            <div class="filter-group">
-                <label class="filter-label">Game</label>
-                <select class="form-select" name="game" onchange="this.form.submit()">
-                    <option value="">All Games</option>
-                    {% for game in games %}
-                        <option value="{{ game }}" {% if request.GET.game == game %}selected{% endif %}>{{ game }}</option>
-                    {% endfor %}
-                </select>
+            <div class="detail-info-item">
+                <span class="detail-info-item__label">Condition</span>
+                <span class="detail-info-item__value">{{ listing.condition|default:"Near Mint" }}</span>
             </div>
- 
-            <!-- Rarity -->
-            <div class="filter-group">
-                <label class="filter-label">Rarity</label>
-                <div class="filter-checkboxes">
-                    {% for rarity in rarities %}
-                        <label class="filter-checkbox">
-                            <input
-                                type="checkbox"
-                                name="rarity"
-                                value="{{ rarity }}"
-                                {% if rarity in selected_rarities %}checked{% endif %}
-                                onchange="this.form.submit()"
-                            >
-                            <span class="rarity-badge rarity-badge--{{ rarity|lower }}">{{ rarity }}</span>
-                        </label>
-                    {% endfor %}
-                </div>
-            </div>
- 
-            <!-- Price Range -->
-            <div class="filter-group">
-                <label class="filter-label">Price Range</label>
-                <div class="filter-price-row">
-                    <input
-                        class="form-input form-input--sm"
-                        type="number"
-                        name="min_price"
-                        placeholder="Min $"
-                        value="{{ request.GET.min_price }}"
-                        min="0"
-                    >
-                    <span class="filter-price-sep">—</span>
-                    <input
-                        class="form-input form-input--sm"
-                        type="number"
-                        name="max_price"
-                        placeholder="Max $"
-                        value="{{ request.GET.max_price }}"
-                        min="0"
-                    >
-                </div>
-            </div>
- 
-            <button type="submit" class="btn btn-gold" style="width:100%; justify-content:center;">Apply</button>
- 
-        </form>
-    </aside>
- 
-    <!-- RESULTS -->
-    <div class="catalog-results">
- 
-        <!-- Sort bar -->
-        <div class="catalog-bar">
-            <span class="catalog-bar__count">
-                {% if listings %}{{ listings|length }} result{% if listings|length != 1 %}s{% endif %}{% else %}No results{% endif %}
-            </span>
-            <div class="catalog-bar__sort">
-                <label class="filter-label" style="margin:0">Sort by</label>
-                <select class="form-select form-select--sm" name="sort" form="listings-filter-form" onchange="document.getElementById('listings-filter-form').submit()">
-                    <option value="newest"    {% if request.GET.sort == 'newest' %}selected{% endif %}>Newest</option>
-                    <option value="price_asc" {% if request.GET.sort == 'price_asc' %}selected{% endif %}>Price: Low → High</option>
-                    <option value="price_desc"{% if request.GET.sort == 'price_desc' %}selected{% endif %}>Price: High → Low</option>
-                    <option value="name"      {% if request.GET.sort == 'name' %}selected{% endif %}>Card Name</option>
-                </select>
+            <div class="detail-info-item">
+                <span class="detail-info-item__label">Available</span>
+                <span class="detail-info-item__value">{{ listing.quantity }}</span>
             </div>
         </div>
- 
-        <!-- Listings -->
-        {% if listings %}
-            <div class="listings-list">
-                {% for listing in listings %}
-                    <div class="listing-row">
- 
-                        <!-- Image -->
-                        <div class="listing-row__image-wrap">
-                            {% if listing.card.image_url %}
-                                <img src="{{ listing.card.image_url }}" alt="{{ listing.card.name }}">
-                            {% else %}
-                                <div class="listing-row__image-placeholder">🃏</div>
-                            {% endif %}
-                        </div>
- 
-                        <!-- Card info -->
-                        <div class="listing-row__info">
-                            <a href="{% url 'card_detail' listing.card.id %}" class="listing-row__name">
-                                {{ listing.card.name }}
-                            </a>
-                            <div class="listing-row__meta">
-                                <span class="rarity-badge rarity-badge--{{ listing.card.rarity|lower }}">{{ listing.card.rarity }}</span>
-                                <span class="listing-row__set">{{ listing.card.set_name }}</span>
-                                <span class="listing-row__game">{{ listing.card.game }}</span>
-                            </div>
-                            <div class="listing-row__condition">
-                                Condition: <span>{{ listing.condition|default:"Near Mint" }}</span>
-                            </div>
-                        </div>
- 
-                        <!-- Seller -->
-                        <div class="listing-row__seller">
-                            <span class="listing-row__seller-label">Seller</span>
-                            <span class="listing-row__seller-name">{{ listing.seller.username }}</span>
-                        </div>
- 
-                        <!-- Qty -->
-                        <div class="listing-row__qty">
-                            <span class="listing-row__qty-label">Available</span>
-                            <span class="listing-row__qty-value">{{ listing.quantity }}</span>
-                        </div>
- 
-                        <!-- Price + action -->
-                        <div class="listing-row__action">
-                            <span class="listing-row__price">${{ listing.price_per_unit }}</span>
-                            {% if user.is_authenticated %}
-                                <a href="{% url 'listing_detail' listing.id %}" class="btn btn-gold btn-sm">Buy Now</a>
-                            {% else %}
-                                <a href="{% url 'login' %}" class="btn btn-outline-gold btn-sm">Login to Buy</a>
-                            {% endif %}
-                        </div>
- 
-                    </div>
-                {% endfor %}
-            </div>
- 
-        {% else %}
-            <div class="empty-state">
-                <p style="font-size:2rem">📭</p>
-                <p>No listings match your filters.</p>
-                <a href="{% url 'listings' %}" class="btn btn-outline-gold btn-sm" style="margin-top:16px">Clear filters</a>
+
+        {% if error %}
+            <div class="empty-state" style="margin-top:16px">
+                <p>{{ error }}</p>
             </div>
         {% endif %}
- 
+
+        {% if user.is_authenticated %}
+            <form method="POST" style="margin-top:24px">
+                {% csrf_token %}
+                <div class="filter-price-row" style="margin-bottom:16px">
+                    <input
+                        class="form-input"
+                        type="number"
+                        name="quantity"
+                        value="1"
+                        min="1"
+                        max="{{ listing.quantity }}"
+                    >
+                </div>
+                <button type="submit" class="btn btn-gold detail-buy-btn">Buy Now</button>
+            </form>
+        {% else %}
+            <a href="{% url 'login' %}" class="btn btn-outline-gold detail-buy-btn">Login to Buy</a>
+        {% endif %}
     </div>
 </div>
- 
+
 {% endblock %}

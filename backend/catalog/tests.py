@@ -1,13 +1,14 @@
 from decimal import Decimal
 from io import StringIO
 
+from django.contrib import admin
 from django.core.exceptions import ValidationError
 from django.core.management import call_command
 from django.db import IntegrityError, models, transaction
+from django.test import TestCase
 from django.urls import reverse
 from rest_framework import status
 from rest_framework.test import APITestCase
-from django.test import TestCase
 
 from catalog.models import Card, CardGame, CardImage, CardSet, CardVariant
 
@@ -128,6 +129,22 @@ class SeedCatalogCommandTests(TestCase):
             self.assertEqual(variant.set, card_set)
             self.assertEqual(variant.card.game, game)
             self.assertIsNotNone(variant.image)
+
+
+class CatalogAdminTests(TestCase):
+    def test_card_variant_admin_is_optimized_for_inspection(self):
+        variant_admin = admin.site._registry[CardVariant]
+
+        self.assertEqual(variant_admin.list_select_related, ("card", "set"))
+        self.assertEqual(variant_admin.autocomplete_fields, ("card", "set"))
+        self.assertIn("created_at", variant_admin.readonly_fields)
+        self.assertIn("updated_at", variant_admin.readonly_fields)
+
+    def test_card_image_admin_uses_autocomplete_for_variant_lookup(self):
+        image_admin = admin.site._registry[CardImage]
+
+        self.assertEqual(image_admin.list_select_related, ("card_variant__card", "card_variant__set"))
+        self.assertEqual(image_admin.autocomplete_fields, ("card_variant",))
 
 
 class CatalogReadApiTests(APITestCase):
