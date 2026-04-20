@@ -867,6 +867,7 @@ Deferred steps:
 - [x] Create a repeatable dataset import command for the downloaded Pokemon cards CSV
 - [x] Import available Base Set and Jungle Pokemon cards as ownable catalog variants
 - [x] Avoid duplicate catalog rows when the import command is rerun
+- [x] Clear old sample-only image metadata when imported rows are refreshed from the CSV
 - [ ] Expand the dataset import later when we choose the source for missing Trainer/Energy cards
 - [ ] Seed or import later:
   - users

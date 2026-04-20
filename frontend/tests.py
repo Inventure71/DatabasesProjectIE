@@ -1,16 +1,18 @@
 from decimal import Decimal
 
 from django.contrib.auth import get_user_model
+from django.core.files.uploadedfile import SimpleUploadedFile
 from django.db import connection
 from django.test import TestCase
 from django.test.utils import CaptureQueriesContext
 from django.urls import reverse
+from django.utils import timezone
 
 from catalog.models import Card, CardGame, CardImage, CardSet, CardVariant
 from inventory.models import InventoryItem
 from inventory.services import add_inventory_item
 from marketplace.models import MarketListing, PurchaseOrder
-from marketplace.services import create_listing
+from marketplace.services import create_listing, purchase_listing
 from pricing.services import record_price_snapshot
 
 
@@ -100,6 +102,31 @@ class FrontendBackendApiWiringTests(TestCase):
         self.assertContains(response, "Backend Set")
         self.assertContains(response, "42.50")
 
+    def test_catalog_page_defaults_to_shared_card_album_view(self):
+        response = self.client.get(reverse("catalog"), {"q": "Backend Dragon"})
+
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, 'class="browser-view-toggle"')
+        self.assertContains(response, 'class="browser-view-toggle__link browser-view-toggle__link--active"')
+        self.assertContains(response, "Card")
+        self.assertContains(response, "Collection Book Cover")
+        self.assertContains(response, "Shelf")
+        self.assertContains(response, 'class="album-card-grid"')
+        self.assertContains(response, "Album Page")
+
+    def test_catalog_page_can_switch_to_set_books_and_game_shelves(self):
+        set_response = self.client.get(reverse("catalog"), {"view": "set"})
+        shelf_response = self.client.get(reverse("catalog"), {"view": "shelf"})
+
+        self.assertEqual(set_response.status_code, 200)
+        self.assertContains(set_response, 'class="collection-book-shelf"')
+        self.assertContains(set_response, "Collection Book Cover")
+        self.assertContains(set_response, "Backend Set")
+
+        self.assertEqual(shelf_response.status_code, 200)
+        self.assertContains(shelf_response, 'class="game-shelf-grid"')
+        self.assertContains(shelf_response, "Backend TCG")
+
     def test_catalog_page_paginates_card_results_in_database(self):
         for index in range(1, 13):
             card = Card.objects.create(
@@ -142,6 +169,92 @@ class FrontendBackendApiWiringTests(TestCase):
         ]
         self.assertGreaterEqual(len(limited_queries), 2)
 
+    def test_home_page_showcases_most_expensive_card_sold_this_month(self):
+        old_expensive_sale = purchase_listing(
+            buyer=self.buyer,
+            listing=self.listing,
+            quantity=1,
+        )
+        PurchaseOrder.objects.filter(pk=old_expensive_sale.pk).update(
+            created_at=timezone.now() - timezone.timedelta(days=40),
+        )
+
+        current_month_card = Card.objects.create(game=self.game, name="Monthly Trophy Dragon")
+        current_month_variant = CardVariant.objects.create(
+            card=current_month_card,
+            set=self.card_set,
+            collector_number="2/99",
+            rarity=CardVariant.Rarity.SECRET_RARE,
+            finish=CardVariant.Finish.HOLO,
+            current_value=Decimal("120.00"),
+        )
+        CardImage.objects.create(
+            card_variant=current_month_variant,
+            image_url="https://example.com/monthly-trophy-dragon.png",
+        )
+        current_month_inventory = add_inventory_item(
+            owner=self.seller,
+            card_variant=current_month_variant,
+            condition=InventoryItem.Condition.NEAR_MINT,
+            quantity=1,
+            actor=self.seller,
+        )
+        current_month_listing = create_listing(
+            seller=self.seller,
+            inventory_item=current_month_inventory,
+            quantity=1,
+            unit_price=Decimal("120.00"),
+        )
+        purchase_listing(
+            buyer=self.buyer,
+            listing=current_month_listing,
+            quantity=1,
+        )
+
+        response = self.client.get(reverse("home"))
+
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, "Most expensive card sold this month")
+        self.assertContains(response, "Monthly Trophy Dragon")
+        self.assertContains(response, "$120.00")
+        self.assertContains(response, 'id="kinetic-card-preview-title">Monthly Trophy Dragon')
+        self.assertNotContains(response, 'id="kinetic-card-preview-title">Backend Dragon')
+
+    def test_card_surfaces_reuse_kinetic_card_component(self):
+        home_response = self.client.get(reverse("home"))
+        catalog_response = self.client.get(reverse("catalog"), {"q": "Backend Dragon"})
+        listings_response = self.client.get(reverse("listings"), {"q": "Backend Dragon"})
+        card_detail_response = self.client.get(reverse("card_detail", kwargs={"card_id": self.card.pk}))
+        listing_detail_response = self.client.get(reverse("listing_detail", kwargs={"listing_id": self.listing.pk}))
+        self.client.force_login(self.seller)
+        collection_response = self.client.get(reverse("collection"))
+
+        self.assertEqual(home_response.status_code, 200)
+        self.assertContains(home_response, 'data-kinetic-card')
+        self.assertContains(home_response, 'class="kinetic-card__tilt"')
+        self.assertContains(home_response, "Backend Dragon")
+
+        self.assertEqual(catalog_response.status_code, 200)
+        self.assertContains(catalog_response, 'class="album-card-grid"')
+        self.assertContains(catalog_response, 'data-kinetic-card')
+
+        self.assertEqual(listings_response.status_code, 200)
+        self.assertContains(listings_response, 'data-kinetic-card')
+
+        self.assertEqual(card_detail_response.status_code, 200)
+        self.assertContains(card_detail_response, 'data-kinetic-card')
+
+        self.assertEqual(listing_detail_response.status_code, 200)
+        self.assertContains(listing_detail_response, 'data-kinetic-card')
+
+        self.assertEqual(collection_response.status_code, 200)
+        self.assertContains(collection_response, 'data-kinetic-card')
+
+    def test_collection_page_requires_login(self):
+        response = self.client.get(reverse("collection"))
+
+        self.assertRedirects(response, f"{reverse('login')}?next={reverse('collection')}")
+
     def test_marketplace_page_uses_real_backend_listing_data(self):
         response = self.client.get(reverse("listings"), {"q": "Backend Dragon"})
 
@@ -149,6 +262,137 @@ class FrontendBackendApiWiringTests(TestCase):
         self.assertContains(response, "Backend Dragon")
         self.assertContains(response, "frontend-seller")
         self.assertContains(response, "50.00")
+
+    def test_marketplace_page_defaults_to_shared_card_album_view(self):
+        response = self.client.get(reverse("listings"), {"q": "Backend Dragon"})
+
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, 'class="browser-view-toggle"')
+        self.assertContains(response, 'class="album-card-grid"')
+        self.assertContains(response, "Album Page")
+        self.assertContains(response, 'name="set"')
+        self.assertContains(response, 'name="language"')
+
+    def test_listing_cards_use_listed_by_copy_for_active_listings(self):
+        response = self.client.get(reverse("home"))
+
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, "Listed by")
+        self.assertNotContains(response, "Sold by")
+
+    def test_my_listings_page_shows_only_authenticated_users_active_listings(self):
+        buyer_inventory = add_inventory_item(
+            owner=self.buyer,
+            card_variant=self.variant,
+            condition=InventoryItem.Condition.DAMAGED,
+            quantity=1,
+            actor=self.buyer,
+        )
+        create_listing(
+            seller=self.buyer,
+            inventory_item=buyer_inventory,
+            quantity=1,
+            unit_price=Decimal("61.00"),
+        )
+        self.client.force_login(self.seller)
+
+        response = self.client.get(reverse("my_listings"))
+
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, "My Active Listings")
+        self.assertContains(response, "Backend Dragon")
+        self.assertContains(response, "frontend-seller")
+        self.assertContains(response, "50.00")
+        self.assertContains(response, "Listed")
+        self.assertNotContains(response, "frontend-buyer")
+        self.assertNotContains(response, "61.00")
+
+    def test_my_listings_page_requires_login(self):
+        response = self.client.get(reverse("my_listings"))
+
+        self.assertRedirects(response, f"{reverse('login')}?next={reverse('my_listings')}")
+
+    def test_collection_page_organizes_owned_cards_as_set_books_with_album_filters(self):
+        jungle_set = CardSet.objects.create(game=self.game, name="Jungle", code="JUNG")
+        jungle_card = Card.objects.create(game=self.game, name="Jungle Cat")
+        jungle_variant = CardVariant.objects.create(
+            card=jungle_card,
+            set=jungle_set,
+            collector_number="4/64",
+            rarity=CardVariant.Rarity.UNCOMMON,
+            current_value=Decimal("12.00"),
+        )
+        CardImage.objects.create(
+            card_variant=jungle_variant,
+            image_url="https://example.com/jungle-cat.png",
+        )
+        add_inventory_item(
+            owner=self.seller,
+            card_variant=jungle_variant,
+            condition=InventoryItem.Condition.LIGHTLY_PLAYED,
+            quantity=1,
+            actor=self.seller,
+        )
+        self.client.force_login(self.seller)
+
+        response = self.client.get(reverse("collection"), {"view": "card", "set": "Jungle"})
+        default_response = self.client.get(reverse("collection"))
+
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, 'class="browser-view-toggle"')
+        self.assertContains(response, 'class="album-card-grid"')
+        self.assertContains(response, "Album Page")
+        self.assertContains(response, "Jungle")
+        self.assertContains(response, 'name="q"')
+        self.assertContains(response, 'name="rarity"')
+        self.assertContains(response, 'name="language"')
+        self.assertContains(response, "Jungle Cat")
+        self.assertContains(response, "Backend Set")
+        self.assertContains(default_response, 'class="browser-view-toggle"')
+        self.assertContains(default_response, 'class="collection-book-shelf"')
+        self.assertContains(default_response, "Collection Book Cover")
+
+    def test_my_listings_page_uses_set_books_and_album_filters_for_active_listings(self):
+        jungle_set = CardSet.objects.create(game=self.game, name="Jungle", code="JUNG")
+        jungle_card = Card.objects.create(game=self.game, name="Jungle Cat")
+        jungle_variant = CardVariant.objects.create(
+            card=jungle_card,
+            set=jungle_set,
+            collector_number="4/64",
+            rarity=CardVariant.Rarity.UNCOMMON,
+            current_value=Decimal("12.00"),
+        )
+        CardImage.objects.create(
+            card_variant=jungle_variant,
+            image_url="https://example.com/jungle-cat.png",
+        )
+        jungle_inventory = add_inventory_item(
+            owner=self.seller,
+            card_variant=jungle_variant,
+            condition=InventoryItem.Condition.LIGHTLY_PLAYED,
+            quantity=2,
+            actor=self.seller,
+        )
+        create_listing(
+            seller=self.seller,
+            inventory_item=jungle_inventory,
+            quantity=1,
+            unit_price=Decimal("18.00"),
+        )
+        self.client.force_login(self.seller)
+
+        response = self.client.get(reverse("my_listings"), {"set": "Jungle"})
+
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, 'class="collection-book-shelf"')
+        self.assertContains(response, 'class="collection-book collection-book--active"')
+        self.assertContains(response, "Listing Book")
+        self.assertContains(response, 'class="album-filter-form"')
+        self.assertContains(response, 'name="q"')
+        self.assertContains(response, 'name="rarity"')
+        self.assertContains(response, "Jungle Cat")
+        self.assertContains(response, "$18.00")
+        self.assertNotContains(response, "$50.00")
 
     def test_card_detail_uses_real_backend_price_history_and_listings(self):
         response = self.client.get(reverse("card_detail", kwargs={"card_id": self.card.pk}))
@@ -177,6 +421,7 @@ class FrontendBackendApiWiringTests(TestCase):
     def test_frontend_backend_api_services_cover_authenticated_backend_apis(self):
         from frontend.services.backend_api import (
             add_inventory_item_for_user,
+            create_marketplace_listing_for_user,
             get_collection_value,
             get_current_user,
             list_my_inventory,
@@ -205,14 +450,141 @@ class FrontendBackendApiWiringTests(TestCase):
             item_id=added_item["id"],
             quantity=1,
         )
+        sellable_item = add_inventory_item_for_user(
+            user=self.buyer,
+            card_variant_id=self.variant.id,
+            condition=InventoryItem.Condition.DAMAGED,
+            quantity=1,
+        )
+        listing = create_marketplace_listing_for_user(
+            user=self.buyer,
+            inventory_item_id=sellable_item["id"],
+            quantity=1,
+            unit_price=Decimal("60.00"),
+        )
 
         self.client.force_login(self.buyer)
         self.client.post(reverse("listing_detail", kwargs={"listing_id": self.listing.pk}), {"quantity": "1"})
 
         self.assertEqual(user_data["username"], "frontend-buyer")
-        self.assertEqual(len(list_my_inventory(self.buyer)), 2)
+        self.assertEqual(len(list_my_inventory(self.buyer)), 3)
         self.assertEqual(updated_item["reserved_quantity"], 1)
         self.assertEqual(removed_item["quantity"], 1)
+        self.assertEqual(listing["seller"]["username"], "frontend-buyer")
         self.assertEqual(get_collection_value(self.buyer)["currency"], "EUR")
         self.assertEqual(len(list_my_purchases(self.buyer)), 1)
         self.assertEqual(len(list_my_sales(self.seller)), 1)
+
+    def test_collection_page_shows_owned_inventory_and_collection_value(self):
+        self.client.force_login(self.seller)
+
+        response = self.client.get(reverse("collection"), {"view": "card"})
+
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, "My Collection")
+        self.assertContains(response, "Backend Dragon")
+        self.assertContains(response, "frontend-seller")
+        self.assertContains(response, "127.50")
+        self.assertContains(response, "Available")
+        self.assertContains(response, "Sell")
+
+    def test_collection_page_post_adds_new_physical_inventory_item_with_photo(self):
+        self.client.force_login(self.buyer)
+        image = SimpleUploadedFile(
+            "buyer-front.jpg",
+            b"fake image bytes",
+            content_type="image/jpeg",
+        )
+
+        response = self.client.post(
+            reverse("collection"),
+            {
+                "form_action": "add_inventory",
+                "card_variant_id": str(self.variant.id),
+                "condition": InventoryItem.Condition.NEAR_MINT,
+                "quantity": "1",
+                "purchase_price": "11.25",
+                "photo": image,
+            },
+        )
+
+        added_item = InventoryItem.objects.get(owner=self.buyer, card_variant=self.variant)
+        self.assertRedirects(response, f"{reverse('collection')}?added={added_item.id}")
+        self.assertEqual(added_item.quantity, 1)
+        self.assertEqual(added_item.purchase_price, Decimal("11.25"))
+        self.assertEqual(added_item.photos.count(), 1)
+
+    def test_collection_page_add_keeps_duplicate_physical_copies_separate(self):
+        add_inventory_item(
+            owner=self.buyer,
+            card_variant=self.variant,
+            condition=InventoryItem.Condition.NEAR_MINT,
+            quantity=1,
+            actor=self.buyer,
+        )
+        self.client.force_login(self.buyer)
+
+        response = self.client.post(
+            reverse("collection"),
+            {
+                "form_action": "add_inventory",
+                "card_variant_id": str(self.variant.id),
+                "condition": InventoryItem.Condition.NEAR_MINT,
+                "quantity": "1",
+            },
+        )
+
+        self.assertEqual(response.status_code, 302)
+        self.assertEqual(
+            InventoryItem.objects.filter(
+                owner=self.buyer,
+                card_variant=self.variant,
+                condition=InventoryItem.Condition.NEAR_MINT,
+            ).count(),
+            2,
+        )
+
+    def test_collection_page_post_creates_listing_from_owned_inventory(self):
+        buyer_inventory = add_inventory_item(
+            owner=self.buyer,
+            card_variant=self.variant,
+            condition=InventoryItem.Condition.LIGHTLY_PLAYED,
+            quantity=2,
+            actor=self.buyer,
+        )
+        self.client.force_login(self.buyer)
+
+        response = self.client.post(
+            reverse("collection"),
+            {
+                "inventory_item_id": buyer_inventory.id,
+                "quantity": "1",
+                "unit_price": "64.25",
+            },
+        )
+        buyer_inventory.refresh_from_db()
+
+        listing = MarketListing.objects.get(seller=self.buyer, inventory_item=buyer_inventory)
+        self.assertRedirects(response, f"{reverse('collection')}?listed={listing.id}")
+        self.assertEqual(listing.quantity, 1)
+        self.assertEqual(listing.quantity_available, 1)
+        self.assertEqual(listing.unit_price, Decimal("64.25"))
+        self.assertEqual(buyer_inventory.reserved_quantity, 1)
+
+    def test_collection_page_rejects_selling_more_than_available_inventory(self):
+        self.client.force_login(self.seller)
+
+        response = self.client.post(
+            reverse("collection"),
+            {
+                "inventory_item_id": self.seller_inventory.id,
+                "quantity": "2",
+                "unit_price": "99.00",
+            },
+        )
+        self.seller_inventory.refresh_from_db()
+
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, "Cannot list more than the available inventory quantity.")
+        self.assertEqual(self.seller_inventory.reserved_quantity, 2)
+        self.assertEqual(MarketListing.objects.filter(seller=self.seller).count(), 1)

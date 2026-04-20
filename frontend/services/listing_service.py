@@ -1,4 +1,4 @@
-from catalog.models import CardGame
+from catalog.models import CardGame, CardSet, CardVariant
 from marketplace.models import MarketListing
 
 from .catalog_service import RARITIES, _getlist, _maximum_price, _minimum_price, _variant_to_frontend_card
@@ -8,6 +8,8 @@ def list_listings(params, *, limit=None):
     listings = _active_listing_queryset()
     query = params.get("q", "").strip()
     game = params.get("game", "")
+    set_name = params.get("set", "")
+    language = params.get("language", "")
     selected_rarities = [rarity for rarity in _getlist(params, "rarity") if rarity]
     min_price = _minimum_price(params)
     max_price = _maximum_price(params)
@@ -16,6 +18,10 @@ def list_listings(params, *, limit=None):
         listings = listings.filter(inventory_item__card_variant__card__name__icontains=query)
     if game:
         listings = listings.filter(inventory_item__card_variant__card__game__name=game)
+    if set_name:
+        listings = listings.filter(inventory_item__card_variant__set__name=set_name)
+    if language:
+        listings = listings.filter(inventory_item__card_variant__language=language)
     if selected_rarities:
         listings = listings.filter(inventory_item__card_variant__rarity__in=selected_rarities)
     if min_price is not None:
@@ -50,7 +56,9 @@ def get_listing_facets():
     active_listings = _active_listing_queryset()
     return {
         "games": list(CardGame.objects.order_by("name").values_list("name", flat=True)),
+        "sets": list(CardSet.objects.order_by("name").values_list("name", flat=True)),
         "rarities": RARITIES,
+        "languages": list(CardVariant.objects.order_by("language").values_list("language", flat=True).distinct()),
         "total_listings": active_listings.count(),
     }
 

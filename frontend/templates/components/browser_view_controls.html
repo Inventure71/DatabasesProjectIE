@@ -1,0 +1,11 @@
+<div class="browser-view-toggle" aria-label="Visualization options">
+    {% for option in browser.view_options %}
+        <a
+            href="?{{ option.query }}"
+            class="browser-view-toggle__link{% if option.is_active %} browser-view-toggle__link--active{% endif %}"
+            aria-current="{% if option.is_active %}page{% else %}false{% endif %}"
+        >
+            {{ option.label }}
+        </a>
+    {% endfor %}
+</div>

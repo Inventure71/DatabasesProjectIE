@@ -136,6 +136,9 @@ class Command(BaseCommand):
             card_variant=variant,
             defaults={
                 "image_url": row["image_url"],
+                "image_hash": "",
+                "width": None,
+                "height": None,
             },
         )
 

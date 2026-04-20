@@ -2,11 +2,7 @@
 <div class="listing-card">
 
     <div class="listing-card__image-wrap">
-        {% if listing.card.image_url %}
-            <img src="{{ listing.card.image_url }}" alt="{{ listing.card.name }}">
-        {% else %}
-            <div class="listing-card__image-placeholder">🃏</div>
-        {% endif %}
+        {% include "components/kinetic_card.html" with card=listing.card kinetic_card_class="kinetic-card--listing-card" %}
     </div>
 
     <div class="listing-card__body">
@@ -18,7 +14,7 @@
         </div>
 
         <div class="listing-card__seller">
-            <span>Sold by</span> {{ listing.seller.username }}
+            <span>Listed by</span> {{ listing.seller.username }}
         </div>
     </div>
 

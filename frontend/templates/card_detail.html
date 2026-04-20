@@ -15,11 +15,7 @@
  
     <!-- LEFT: Image -->
     <div class="detail-image-wrap">
-        {% if card.image_url %}
-            <img src="{{ card.image_url }}" alt="{{ card.name }}" class="detail-image">
-        {% else %}
-            <div class="detail-image-placeholder">🃏</div>
-        {% endif %}
+        {% include "components/kinetic_card.html" with card=card kinetic_card_class="kinetic-card--detail" %}
     </div>
  
     <!-- RIGHT: Metadata -->

@@ -161,6 +161,9 @@ class ImportPokemonCardsDatasetCommandTests(TestCase):
         self.assertEqual(charizard_variant.language, "en")
         self.assertEqual(charizard_variant.current_value, Decimal("0.00"))
         self.assertEqual(charizard_variant.image.image_url, "https://example.com/charizard.png")
+        self.assertEqual(charizard_variant.image.image_hash, "")
+        self.assertIsNone(charizard_variant.image.width)
+        self.assertIsNone(charizard_variant.image.height)
 
         jolteon_variant = CardVariant.objects.get(card__name="Jolteon")
         self.assertEqual(jolteon_variant.set, jungle_set)

@@ -337,6 +337,7 @@ Important mapping:
 - `CardVariant.language` is `en`.
 - `CardVariant.current_value` starts at `0.00`.
 - `CardImage.image_url` comes from CSV `image_url`.
+- `CardImage.image_hash`, `width`, and `height` are cleared because the CSV import source does not provide stable values for those fields.
 
 Important behavior:
 

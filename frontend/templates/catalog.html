@@ -16,6 +16,7 @@
     <!-- SIDEBAR FILTERS -->
     <aside class="filter-sidebar">
         <form method="GET" action="{% url 'catalog' %}" id="filter-form">
+            <input type="hidden" name="view" value="{{ browser.view }}">
  
             <div class="filter-sidebar__header">
                 <span class="filter-sidebar__title">Filters</span>
@@ -125,6 +126,7 @@
  
     <!-- RESULTS AREA -->
     <div class="catalog-results">
+        {% include "components/browser_view_controls.html" %}
  
         <!-- Sort + count bar -->
         <div class="catalog-bar">
@@ -141,43 +143,7 @@
                 </select>
             </div>
         </div>
- 
-        <!-- Card grid -->
-        <div class="card-grid">
-            {% for card in cards %}
-                {% include "components/card_item.html" %}
-            {% empty %}
-                <div class="empty-state">
-                    <p style="font-size:2rem">🔍</p>
-                    <p>No cards match your filters.</p>
-                    <a href="{% url 'catalog' %}" class="btn btn-outline-gold btn-sm" style="margin-top:16px">Clear filters</a>
-                </div>
-            {% endfor %}
-        </div>
-
-        {% if pagination.num_pages > 1 %}
-            <nav class="pagination" aria-label="Catalog pages">
-                {% if pagination.has_previous %}
-                    <a
-                        class="btn btn-outline-gold btn-sm"
-                        href="{% if pagination_query %}?{{ pagination_query }}&page={{ pagination.previous_page_number }}{% else %}?page={{ pagination.previous_page_number }}{% endif %}"
-                    >
-                        Previous
-                    </a>
-                {% endif %}
-
-                <span class="pagination__status">Page {{ pagination.page }} of {{ pagination.num_pages }}</span>
-
-                {% if pagination.has_next %}
-                    <a
-                        class="btn btn-outline-gold btn-sm"
-                        href="{% if pagination_query %}?{{ pagination_query }}&page={{ pagination.next_page_number }}{% else %}?page={{ pagination.next_page_number }}{% endif %}"
-                    >
-                        Next
-                    </a>
-                {% endif %}
-            </nav>
-        {% endif %}
+        {% include "components/browser_results.html" %}
  
     </div>
 </div>

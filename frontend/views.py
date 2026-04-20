@@ -1,14 +1,33 @@
+from decimal import Decimal, InvalidOperation
+
 from django.contrib.auth import login, logout
+from django.contrib.auth.decorators import login_required
 from django.contrib.auth.forms import AuthenticationForm, UserCreationForm
 from django.core.exceptions import ValidationError
 from django.shortcuts import redirect, render
+from django.urls import reverse
 from django.views.decorators.http import require_POST
 
-from frontend.services.backend_api import buy_marketplace_listing
+from frontend.services.album_service import (
+    CARD_VIEW,
+    SET_VIEW,
+    build_collection_album,
+    build_listing_album,
+    build_record_browser,
+    resolve_browser_view,
+)
+from frontend.services.backend_api import (
+    buy_marketplace_listing,
+    create_marketplace_listing_for_user,
+    get_collection_value,
+    list_my_active_listings,
+    list_my_inventory,
+)
 from frontend.services.catalog_service import (
     build_price_history,
     get_card,
     get_card_facets,
+    get_most_expensive_card_sold_this_month,
     list_active_listings_for_card,
     list_card_page,
     list_cards,
@@ -22,11 +41,16 @@ from frontend.services.listing_service import (
 
 
 def home(request):
+    featured_cards = list_cards({}, limit=6)
+    monthly_top_sale = get_most_expensive_card_sold_this_month()
+    showcase_card = monthly_top_sale or (featured_cards[0] if featured_cards else None)
     return render(
         request,
         "home.html",
         {
-            "featured_cards": list_cards({}, limit=6),
+            "featured_cards": featured_cards,
+            "showcase_card": showcase_card,
+            "showcase_is_sale": monthly_top_sale is not None,
             "latest_listings": list_listings({}, limit=6),
         },
     )
@@ -35,6 +59,15 @@ def home(request):
 def catalog(request):
     facets = get_card_facets()
     card_page = list_card_page(request.GET)
+    browser_view = resolve_browser_view(request.GET, CARD_VIEW)
+    browser_records = card_page["results"] if browser_view == CARD_VIEW else list_cards(request.GET)
+    browser = build_record_browser(
+        browser_records,
+        request.GET,
+        mode="catalog",
+        default_view=CARD_VIEW,
+        external_pagination=card_page if browser_view == CARD_VIEW else None,
+    )
     pagination_query = request.GET.copy()
     pagination_query.pop("page", None)
 
@@ -44,6 +77,7 @@ def catalog(request):
         {
             "cards": card_page["results"],
             "result_count": card_page["count"],
+            "browser": browser,
             "pagination": card_page,
             "pagination_query": pagination_query.urlencode(),
             "total_cards": facets["total_cards"],
@@ -75,16 +109,109 @@ def card_detail(request, card_id):
 
 def listings(request):
     facets = get_listing_facets()
+    listings_result = list_listings(request.GET)
 
     return render(
         request,
         "listings.html",
         {
-            "listings": list_listings(request.GET),
+            "listings": listings_result,
+            "browser": build_record_browser(
+                listings_result,
+                request.GET,
+                mode="listings",
+                default_view=CARD_VIEW,
+            ),
             "total_listings": facets["total_listings"],
             "games": facets["games"],
+            "sets": facets["sets"],
             "rarities": facets["rarities"],
+            "languages": facets["languages"],
             "selected_rarities": request.GET.getlist("rarity"),
+        },
+    )
+
+
+@login_required(login_url="login")
+def collection(request):
+    error = None
+
+    if request.method == "POST":
+        try:
+            inventory_item_id = int(request.POST.get("inventory_item_id", ""))
+            quantity = int(request.POST.get("quantity", ""))
+            unit_price = Decimal(request.POST.get("unit_price", ""))
+        except (TypeError, ValueError, InvalidOperation):
+            error = "Enter a valid quantity and price."
+        else:
+            try:
+                listing = create_marketplace_listing_for_user(
+                    user=request.user,
+                    inventory_item_id=inventory_item_id,
+                    quantity=quantity,
+                    unit_price=unit_price,
+                )
+            except ValidationError as exc:
+                error = "; ".join(exc.messages)
+            else:
+                return redirect(f"{reverse('collection')}?listed={listing['id']}")
+
+    inventory_items = list_my_inventory(request.user)
+    collection_value = get_collection_value(request.user)
+    facets = get_card_facets()
+    summary = {
+        "total_quantity": sum(item["quantity"] for item in inventory_items),
+        "available_quantity": sum(item["available_quantity"] for item in inventory_items),
+        "reserved_quantity": sum(item["reserved_quantity"] for item in inventory_items),
+    }
+
+    return render(
+        request,
+        "collection.html",
+        {
+            "inventory_items": inventory_items,
+            "album": build_collection_album(inventory_items, request.GET),
+            "browser": build_record_browser(
+                inventory_items,
+                request.GET,
+                mode="collection",
+                default_view=SET_VIEW,
+            ),
+            "collection_value": collection_value,
+            "summary": summary,
+            "games": facets["games"],
+            "sets": facets["sets"],
+            "rarities": facets["rarities"],
+            "languages": facets["languages"],
+            "selected_rarities": request.GET.getlist("rarity"),
+            "error": error,
+            "listed_id": request.GET.get("listed"),
+        },
+    )
+
+
+@login_required(login_url="login")
+def my_listings(request):
+    active_listings = list_my_active_listings(request.user)
+    summary = {
+        "active_count": len(active_listings),
+        "available_quantity": sum(listing["quantity_available"] for listing in active_listings),
+        "listed_value": sum(listing["quantity_available"] * listing["price_per_unit"] for listing in active_listings),
+    }
+
+    return render(
+        request,
+        "my_listings.html",
+        {
+            "active_listings": active_listings,
+            "album": build_listing_album(active_listings, request.GET),
+            "browser": build_record_browser(
+                active_listings,
+                request.GET,
+                mode="my_listings",
+                default_view=SET_VIEW,
+            ),
+            "summary": summary,
         },
     )
 

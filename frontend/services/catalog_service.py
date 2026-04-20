@@ -1,7 +1,8 @@
 from django.core.paginator import Paginator
+from django.utils import timezone
 
 from catalog.models import Card, CardGame, CardSet, CardVariant
-from marketplace.models import MarketListing
+from marketplace.models import MarketListing, PurchaseOrder, PurchaseOrderLine
 from pricing.models import PriceSnapshot
 
 RARITIES = [choice[0] for choice in CardVariant.Rarity.choices]
@@ -31,6 +32,45 @@ def list_cards(params, *, limit=None):
     if limit is not None:
         queryset = queryset[:limit]
     return [_variant_to_frontend_card(variant) for variant in queryset]
+
+
+def get_most_expensive_card_sold_this_month():
+    now = timezone.localtime()
+    month_start = now.replace(day=1, hour=0, minute=0, second=0, microsecond=0)
+    if month_start.month == 12:
+        next_month_start = month_start.replace(year=month_start.year + 1, month=1)
+    else:
+        next_month_start = month_start.replace(month=month_start.month + 1)
+
+    line = (
+        PurchaseOrderLine.objects.filter(
+            purchase_order__status=PurchaseOrder.Status.COMPLETED,
+            purchase_order__created_at__gte=month_start,
+            purchase_order__created_at__lt=next_month_start,
+        )
+        .select_related(
+            "purchase_order",
+            "card_variant__card__game",
+            "card_variant__set",
+            "card_variant__image",
+        )
+        .order_by("-unit_price", "-purchase_order__created_at", "-id")
+        .first()
+    )
+    if line is None:
+        return None
+
+    card = _variant_to_frontend_card(line.card_variant)
+    card.update(
+        {
+            "sale_price": line.unit_price,
+            "sale_quantity": line.quantity,
+            "sale_total": line.line_total,
+            "sale_currency": line.purchase_order.currency,
+            "sold_at": line.purchase_order.created_at,
+        }
+    )
+    return card
 
 
 def list_card_page(params):

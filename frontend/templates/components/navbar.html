@@ -7,6 +7,8 @@
  
     <div class="navbar__links">
         {% if user.is_authenticated %}
+            <a href="{% url 'collection' %}" class="btn btn-ghost btn-sm">My Collection</a>
+            <a href="{% url 'my_listings' %}" class="btn btn-ghost btn-sm">My Listings</a>
             <span class="navbar__welcome">{{ user.username }}</span>
             <form class="navbar__logout-form" method="post" action="{% url 'logout' %}">
                 {% csrf_token %}

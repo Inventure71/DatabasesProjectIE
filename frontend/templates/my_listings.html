@@ -1,0 +1,165 @@
+{% extends "base.html" %}
+{% load static %}
+
+{% block title %}My Active Listings — Card Marketplace{% endblock %}
+
+{% block content %}
+
+<section class="page-header collection-header">
+    <div>
+        <h1 class="page-header__title">My Active Listings</h1>
+        <p class="page-header__subtitle">Cards you have listed for sale. These are not sold until a buyer completes a purchase.</p>
+    </div>
+    <div class="collection-owner">
+        <span class="collection-owner__label">Seller</span>
+        <span class="collection-owner__name">{{ user.username }}</span>
+    </div>
+</section>
+
+<section class="collection-stats" aria-label="Active listing summary">
+    <div class="collection-stat">
+        <span class="collection-stat__label">Active Listings</span>
+        <span class="collection-stat__value">{{ summary.active_count }}</span>
+    </div>
+    <div class="collection-stat">
+        <span class="collection-stat__label">Available Units</span>
+        <span class="collection-stat__value">{{ summary.available_quantity }}</span>
+    </div>
+    <div class="collection-stat">
+        <span class="collection-stat__label">Listed Value</span>
+        <span class="collection-stat__value">${{ summary.listed_value }}</span>
+    </div>
+    <div class="collection-stat">
+        <span class="collection-stat__label">Status</span>
+        <span class="collection-stat__value">Listed</span>
+    </div>
+</section>
+
+<section class="section collection-album">
+    <div class="section__header">
+        <h2 class="section__title">Listing Albums</h2>
+        <div class="section__actions">
+            <a href="{% url 'collection' %}" class="section__link">Back to collection →</a>
+            <a href="{% url 'listings' %}" class="section__link">Open marketplace →</a>
+        </div>
+    </div>
+
+    {% if album.books %}
+        <div class="collection-book-shelf" aria-label="Listing set books">
+            {% for book in album.books %}
+                <a
+                    href="?{{ book.query }}"
+                    class="collection-book{% if book.is_active %} collection-book--active{% endif %}"
+                    aria-current="{% if book.is_active %}page{% else %}false{% endif %}"
+                >
+                    <span class="collection-book__cover">
+                        {% include "components/kinetic_card.html" with card=book.cover_card kinetic_card_class="kinetic-card--book" %}
+                    </span>
+                    <span class="collection-book__spine">
+                        <span class="collection-book__label">{{ book.set_name }}</span>
+                        <span class="collection-book__meta">{{ book.record_count }} listing{{ book.record_count|pluralize }} · {{ book.unit_count }} unit{{ book.unit_count|pluralize }}</span>
+                        <span class="collection-book__value">${{ book.total_value }}</span>
+                    </span>
+                </a>
+            {% endfor %}
+        </div>
+
+        <div class="album-page">
+            <div class="album-page__header">
+                <div>
+                    <span class="album-page__eyebrow">{{ album.selected_set }}</span>
+                    <h3 class="album-page__title">{{ album.title }}</h3>
+                </div>
+                <span class="album-page__count">
+                    Page {{ album.page.number }} of {{ album.page.num_pages }} · {{ album.page.count }} listing{{ album.page.count|pluralize }}
+                </span>
+            </div>
+
+            <form class="album-filter-form" method="get" action="{% url 'my_listings' %}">
+                <input type="hidden" name="set" value="{{ album.selected_set }}">
+
+                <label class="album-filter-form__field">
+                    <span>Search</span>
+                    <input class="form-input form-input--sm" type="search" name="q" value="{{ album.filters.q }}" placeholder="Card name">
+                </label>
+
+                <label class="album-filter-form__field">
+                    <span>Rarity</span>
+                    <select class="form-input form-input--sm" name="rarity">
+                        <option value="">All rarities</option>
+                        {% for rarity in album.rarities %}
+                            <option value="{{ rarity }}" {% if album.filters.rarity == rarity %}selected{% endif %}>{{ rarity }}</option>
+                        {% endfor %}
+                    </select>
+                </label>
+
+                <button type="submit" class="btn btn-gold btn-sm">Filter</button>
+                <a href="?set={{ album.selected_set|urlencode }}" class="btn btn-ghost btn-sm">Reset</a>
+            </form>
+
+            {% if album.page.items %}
+                <div class="album-card-grid">
+                    {% for listing in album.page.items %}
+                        <article class="album-card-slot">
+                            <div class="album-card-slot__image">
+                                {% include "components/kinetic_card.html" with card=listing.card kinetic_card_class="kinetic-card--album" %}
+                            </div>
+
+                            <div class="album-card-slot__body">
+                                <a href="{% url 'listing_detail' listing.id %}" class="album-card-slot__name">
+                                    {{ listing.card.name }}
+                                </a>
+                                <div class="album-card-slot__meta">
+                                    <span class="rarity-badge rarity-badge--{{ listing.card.rarity|lower }}">{{ listing.card.rarity }}</span>
+                                    <span>{{ listing.condition }}</span>
+                                    <span>Listed by {{ listing.seller.username }}</span>
+                                </div>
+
+                                <dl class="album-card-slot__stats" aria-label="Listing counts">
+                                    <div>
+                                        <dt>Status</dt>
+                                        <dd>Listed</dd>
+                                    </div>
+                                    <div>
+                                        <dt>Available</dt>
+                                        <dd>{{ listing.quantity_available }}</dd>
+                                    </div>
+                                    <div>
+                                        <dt>Price</dt>
+                                        <dd>${{ listing.price_per_unit }}</dd>
+                                    </div>
+                                </dl>
+
+                                <a href="{% url 'listing_detail' listing.id %}" class="btn btn-outline-gold btn-sm album-card-slot__button">View Listing</a>
+                            </div>
+                        </article>
+                    {% endfor %}
+                </div>
+
+                {% if album.page.has_previous or album.page.has_next %}
+                    <nav class="pagination" aria-label="Listing book pages">
+                        {% if album.page.has_previous %}
+                            <a class="btn btn-ghost btn-sm" href="?{{ album.page.previous_query }}">Previous</a>
+                        {% endif %}
+                        <span class="pagination__status">Page {{ album.page.number }} of {{ album.page.num_pages }}</span>
+                        {% if album.page.has_next %}
+                            <a class="btn btn-ghost btn-sm" href="?{{ album.page.next_query }}">Next</a>
+                        {% endif %}
+                    </nav>
+                {% endif %}
+            {% else %}
+                <div class="empty-state">
+                    <p>No listings match these album filters.</p>
+                    <a href="?set={{ album.selected_set|urlencode }}" class="btn btn-outline-gold btn-sm" style="margin-top:16px">Clear filters</a>
+                </div>
+            {% endif %}
+        </div>
+    {% else %}
+        <div class="empty-state">
+            <p>No active listings yet.</p>
+            <a href="{% url 'collection' %}" class="btn btn-outline-gold btn-sm" style="margin-top:16px">List a card</a>
+        </div>
+    {% endif %}
+</section>
+
+{% endblock %}
