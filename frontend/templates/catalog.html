@@ -7,7 +7,13 @@
  
 <section class="page-header">
     <h1 class="page-header__title">Card Catalog</h1>
-    <p class="page-header__subtitle">Browse {{ total_cards }} cards across all sets and games.</p>
+    <p class="page-header__subtitle">
+        {% if selected_available %}
+            Browse cards with active marketplace listings.
+        {% else %}
+            Browse {{ total_cards }} cards across all sets and games.
+        {% endif %}
+    </p>
 </section>
  
 <!-- SEARCH + FILTERS -->
@@ -36,6 +42,20 @@
                         oninput="this.form.elements.view.value='card'"
                     >
                 </div>
+            </div>
+
+            <!-- Availability -->
+            <div class="filter-group">
+                <label class="filter-checkbox">
+                    <input
+                        type="checkbox"
+                        name="available"
+                        value="1"
+                        {% if selected_available %}checked{% endif %}
+                        onchange="this.form.submit()"
+                    >
+                    <span>Only available</span>
+                </label>
             </div>
  
             <!-- Game -->

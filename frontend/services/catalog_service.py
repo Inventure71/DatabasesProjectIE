@@ -1,4 +1,5 @@
 from django.core.paginator import Paginator
+from django.db.models import Exists, OuterRef
 from django.utils import timezone
 
 from catalog.models import Card, CardGame, CardSet, CardVariant
@@ -25,6 +26,10 @@ def _minimum_price(params):
 def _maximum_price(params):
     raw_value = params.get("max_price", "")
     return raw_value if raw_value else None
+
+
+def _available_only(params):
+    return params.get("available", "") in {"1", "true", "on", "yes"}
 
 
 def list_cards(params, *, limit=None):
@@ -101,6 +106,7 @@ def _filter_and_sort_display_variants(params):
     selected_rarities = [rarity for rarity in _getlist(params, "rarity") if rarity]
     min_price = _minimum_price(params)
     max_price = _maximum_price(params)
+    available_only = _available_only(params)
 
     if query:
         queryset = queryset.filter(card__name__icontains=query)
@@ -116,6 +122,13 @@ def _filter_and_sort_display_variants(params):
         queryset = queryset.filter(current_value__gte=min_price)
     if max_price is not None:
         queryset = queryset.filter(current_value__lte=max_price)
+    if available_only:
+        active_listing = MarketListing.objects.filter(
+            inventory_item__card_variant=OuterRef("pk"),
+            status=MarketListing.Status.ACTIVE,
+            quantity_available__gt=0,
+        )
+        queryset = queryset.annotate(has_active_listing=Exists(active_listing)).filter(has_active_listing=True)
 
     sort = params.get("sort", "name")
     if sort == "value_desc":

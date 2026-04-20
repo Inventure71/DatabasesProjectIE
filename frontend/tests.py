@@ -156,7 +156,7 @@ class FrontendBackendApiWiringTests(TestCase):
         self.client.force_login(self.seller)
         responses = [
             self.client.get(reverse("catalog"), {"view": "shelf"}),
-            self.client.get(reverse("listings"), {"view": "shelf"}),
+            self.client.get(reverse("catalog"), {"view": "shelf", "available": "1"}),
             self.client.get(reverse("collection"), {"view": "shelf"}),
         ]
 
@@ -225,6 +225,14 @@ class FrontendBackendApiWiringTests(TestCase):
         ]
         self.assertGreaterEqual(len(limited_queries), 2)
 
+    def test_home_page_prioritizes_latest_listings_above_featured_cards(self):
+        response = self.client.get(reverse("home"))
+
+        self.assertEqual(response.status_code, 200)
+        content = response.content.decode()
+        self.assertLess(content.index("Latest Listings"), content.index("Featured Cards"))
+        self.assertContains(response, f'href="{reverse("catalog")}?available=1#browser"')
+
     def test_home_page_showcases_most_expensive_card_sold_this_month(self):
         old_expensive_sale = purchase_listing(
             buyer=self.buyer,
@@ -279,7 +287,7 @@ class FrontendBackendApiWiringTests(TestCase):
     def test_card_surfaces_reuse_kinetic_card_component(self):
         home_response = self.client.get(reverse("home"))
         catalog_response = self.client.get(reverse("catalog"), {"q": "Backend Dragon"})
-        listings_response = self.client.get(reverse("listings"), {"q": "Backend Dragon"})
+        available_response = self.client.get(reverse("catalog"), {"q": "Backend Dragon", "available": "1"})
         card_detail_response = self.client.get(reverse("card_detail", kwargs={"card_id": self.card.pk}))
         listing_detail_response = self.client.get(reverse("listing_detail", kwargs={"listing_id": self.listing.pk}))
         self.client.force_login(self.seller)
@@ -294,8 +302,8 @@ class FrontendBackendApiWiringTests(TestCase):
         self.assertContains(catalog_response, 'class="album-card-grid"')
         self.assertContains(catalog_response, 'data-kinetic-card')
 
-        self.assertEqual(listings_response.status_code, 200)
-        self.assertContains(listings_response, 'data-kinetic-card')
+        self.assertEqual(available_response.status_code, 200)
+        self.assertContains(available_response, 'data-kinetic-card')
 
         self.assertEqual(card_detail_response.status_code, 200)
         self.assertContains(card_detail_response, 'data-kinetic-card')
@@ -311,23 +319,46 @@ class FrontendBackendApiWiringTests(TestCase):
 
         self.assertRedirects(response, f"{reverse('login')}?next={reverse('collection')}")
 
-    def test_marketplace_page_uses_real_backend_listing_data(self):
-        response = self.client.get(reverse("listings"), {"q": "Backend Dragon"})
+    def test_listings_route_redirects_to_catalog_with_available_filter(self):
+        response = self.client.get(reverse("listings"))
+
+        self.assertEqual(response.status_code, 302)
+        self.assertEqual(response["Location"], f"{reverse('catalog')}?available=1#browser")
+
+    def test_listings_route_preserves_existing_filters_when_redirecting_to_catalog(self):
+        response = self.client.get(
+            reverse("listings"),
+            {"q": "Backend Dragon", "view": "shelf", "sort": "price_asc"},
+        )
+
+        self.assertEqual(response.status_code, 302)
+        redirected = QueryDict(response["Location"].split("?", 1)[1].split("#", 1)[0])
+        self.assertEqual(response["Location"].split("#", 1)[1], "browser")
+        self.assertEqual(redirected.get("q"), "Backend Dragon")
+        self.assertEqual(redirected.get("view"), "shelf")
+        self.assertEqual(redirected.get("available"), "1")
+        self.assertIsNone(redirected.get("sort"))
+
+    def test_catalog_available_filter_shows_only_cards_with_active_listings(self):
+        unlisted_card = Card.objects.create(game=self.game, name="Binder Turtle")
+        CardVariant.objects.create(
+            card=unlisted_card,
+            set=self.card_set,
+            collector_number="2/99",
+            rarity=CardVariant.Rarity.COMMON,
+            current_value=Decimal("8.00"),
+        )
+
+        response = self.client.get(reverse("catalog"), {"available": "1"})
 
         self.assertEqual(response.status_code, 200)
         self.assertContains(response, "Backend Dragon")
-        self.assertContains(response, "frontend-seller")
-        self.assertContains(response, "50.00")
-
-    def test_marketplace_page_defaults_to_shared_card_album_view(self):
-        response = self.client.get(reverse("listings"), {"q": "Backend Dragon"})
-
-        self.assertEqual(response.status_code, 200)
+        self.assertNotContains(response, "Binder Turtle")
+        self.assertContains(response, 'name="available"')
+        self.assertContains(response, 'value="1"')
+        self.assertContains(response, "checked")
         self.assertContains(response, 'class="browser-view-toggle"')
         self.assertContains(response, "album-card-grid")
-        self.assertContains(response, "Album Page")
-        self.assertContains(response, 'name="set"')
-        self.assertContains(response, 'name="language"')
 
     def test_listing_cards_use_listed_by_copy_for_active_listings(self):
         response = self.client.get(reverse("home"))

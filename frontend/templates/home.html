@@ -41,6 +41,24 @@
 </section>
 {% endif %}
 
+<!-- LATEST LISTINGS -->
+<section class="section">
+    <div class="section__header">
+        <h2 class="section__title">Latest Listings</h2>
+        <a href="{% url 'catalog' %}?available=1#browser" class="section__link">Browse all →</a>
+    </div>
+
+    <div class="listing-grid">
+        {% for listing in latest_listings %}
+            {% include "components/listing_item.html" %}
+        {% empty %}
+            <div class="empty-state">
+                <p>No listings available right now.</p>
+            </div>
+        {% endfor %}
+    </div>
+</section>
+
 <!-- FEATURED CARDS -->
 <section class="section">
     <div class="section__header">
@@ -54,24 +72,6 @@
         {% empty %}
             <div class="empty-state">
                 <p>No featured cards at the moment.</p>
-            </div>
-        {% endfor %}
-    </div>
-</section>
-
-<!-- LATEST LISTINGS -->
-<section class="section">
-    <div class="section__header">
-        <h2 class="section__title">Latest Listings</h2>
-        <a href="{% url 'listings' %}" class="section__link">Browse all →</a>
-    </div>
-
-    <div class="listing-grid">
-        {% for listing in latest_listings %}
-            {% include "components/listing_item.html" %}
-        {% empty %}
-            <div class="empty-state">
-                <p>No listings available right now.</p>
             </div>
         {% endfor %}
     </div>

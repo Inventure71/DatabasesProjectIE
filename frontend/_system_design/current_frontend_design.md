@@ -33,13 +33,19 @@ Current backend wiring:
 - Catalog pages read real `Card`, `CardVariant`, `CardSet`, and `CardImage` data.
 - Catalog pages request paginated service results so large catalogs are sliced by the database before template rendering.
 - The home page requests only the featured cards and latest listings it displays instead of loading every row first.
-- Marketplace pages read real active `MarketListing` data.
+- The catalog page is the canonical card browsing surface. Marketplace browsing
+  is represented as the same catalog browser with `available=1`, which filters
+  cards down to variants that have active, quantity-available marketplace
+  listings.
 - Card detail pages read real active listings and `PriceSnapshot` history.
 - Listing detail purchases call the backend marketplace purchase workflow.
 - The collection page reads authenticated inventory and collection valuation data through `frontend.services.backend_api`.
 - Collection sell forms call the marketplace listing service through `create_marketplace_listing_for_user`, so stock reservation and ownership validation stay in the backend service layer.
-- The active listings page reads the authenticated user's active `MarketListing` rows and labels them as listed inventory, not completed sales.
+- The legacy `/listings/` route is retained as a compatibility entry point, but
+  it redirects to `/catalog/?available=1#browser` instead of rendering a
+  separate marketplace browser.
 - The home page monthly showcase reads completed `PurchaseOrderLine` rows and displays the highest unit-price card sold during the current calendar month. If there are no completed sales in the current month, it falls back to the first featured catalog card.
+- The home page monthly showcase uses a centered two-column content group on desktop so the sale copy stays visually paired with the kinetic card instead of drifting toward the left edge. On mobile, the same showcase stacks with centered copy above the card.
 - `frontend.services.backend_api` exposes service wrappers for current user,
   inventory management, marketplace listing creation, marketplace purchases,
   purchase/sales history, price history, and collection valuation.
@@ -56,10 +62,11 @@ Current frontend UI boundary:
   The view still receives flat backend-backed inventory/listing records, but
   `frontend.services.album_service` projects them into set books, selected-set
   pages, top filters, and pagination data for templates.
-- Catalog, marketplace listings, and collection pages now share a browser
-  projection with three visualizations: card album pages, set book covers, and
-  game shelves. Catalog and marketplace listings default to the card album
-  view; collection defaults to set book covers.
+- Catalog and collection pages now share a browser projection with three
+  visualizations: card album pages, set book covers, and game shelves. Catalog
+  defaults to the card album view; collection defaults to set book covers.
+- The catalog sidebar owns the `Only available` filter. Turning it on keeps the
+  user on the same browser and filters to cards that can currently be bought.
 - Shared browser controls avoid carrying stale grouping filters into views where
   they are misleading: switching to set book covers clears the selected set,
   switching to shelves clears the selected game, and manually editing a sidebar
@@ -97,6 +104,9 @@ Current frontend UI boundary:
   section. Buying remains in the active marketplace listings area on the same
   card detail page.
 - The home search form submits to `/catalog/` with the `q` query parameter, so search uses the catalog filtering path.
+- On the home page, latest active listings appear above featured catalog cards.
+  The latest-listings browse link opens the catalog browser with `available=1`
+  so listed cards and catalog cards use one shared page.
 - `frontend/templates/components/kinetic_card.html` owns the reusable physical-card visual treatment. It renders only the card surface so existing page components can decide whether the card is linked, listed, or surrounded by metadata.
 - `frontend/static/js/kinetic-card.js` progressively enhances elements marked with `data-kinetic-card`; without JavaScript the card remains a normal image surface. The `data-kinetic-card` element is the stable pointer hitbox, while the nested `.kinetic-card__tilt` layer receives the 3D transform so corner pointer math does not reset when the card tilts.
 - Card catalog tiles, listing cards, listing rows, detail pages, collection rows, active listing rows, similar cards, and the home monthly showcase all reuse `kinetic_card.html` for visual card rendering.

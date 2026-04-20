@@ -19,6 +19,7 @@ from marketplace.services import (
     pause_listing,
     purchase_listing,
 )
+from pricing.models import PriceSnapshot
 
 
 class MarketplaceModelTests(TestCase):
@@ -692,6 +693,24 @@ class PurchaseWorkflowTests(TestCase):
                 quantity_delta=2,
             ).exists()
         )
+
+    def test_purchase_listing_records_price_snapshot_for_completed_sale(self):
+        listing = create_listing(
+            seller=self.seller,
+            inventory_item=self.seller_inventory,
+            quantity=3,
+            unit_price=Decimal("125.50"),
+        )
+
+        order = purchase_listing(buyer=self.buyer, listing=listing, quantity=2)
+        self.variant.refresh_from_db()
+
+        snapshot = PriceSnapshot.objects.get(card_variant=self.variant)
+        self.assertEqual(snapshot.price, Decimal("125.50"))
+        self.assertEqual(snapshot.currency, listing.currency)
+        self.assertEqual(snapshot.source_name, "marketplace_sale")
+        self.assertEqual(snapshot.captured_at, order.created_at)
+        self.assertEqual(self.variant.current_value, Decimal("125.50"))
 
     def test_purchase_listing_can_sell_sellers_final_reserved_quantity(self):
         listing = create_listing(

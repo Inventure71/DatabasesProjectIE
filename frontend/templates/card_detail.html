@@ -53,7 +53,7 @@
         </div>
  
         {% if user.is_authenticated %}
-            <a href="{% url 'catalog' %}" class="btn btn-gold detail-buy-btn">Browse Listings for this Card</a>
+            <a href="{% url 'catalog' %}?available=1&q={{ card.name|urlencode }}#browser" class="btn btn-gold detail-buy-btn">Browse Listings for this Card</a>
         {% else %}
             <a href="{% url 'login' %}" class="btn btn-outline-gold detail-buy-btn">Login to Buy</a>
         {% endif %}

@@ -97,7 +97,7 @@ class PricingServiceTests(PricingTestCase):
 
         self.assertEqual(self.variant.current_value, Decimal("50.00"))
 
-    def test_update_current_value_uses_newest_snapshot(self):
+    def test_update_current_value_uses_newest_snapshot_when_no_sales_exist(self):
         older_time = timezone.now() - timedelta(days=1)
         newer_time = timezone.now()
         PriceSnapshot.objects.create(
@@ -119,6 +119,42 @@ class PricingServiceTests(PricingTestCase):
         self.variant.refresh_from_db()
 
         self.assertEqual(self.variant.current_value, Decimal("125.50"))
+
+    def test_update_current_value_uses_average_of_last_100_marketplace_sales(self):
+        base_time = timezone.now() - timedelta(days=101)
+        for price in range(1, 102):
+            PriceSnapshot.objects.create(
+                card_variant=self.variant,
+                price=Decimal(price),
+                currency="EUR",
+                source_name="marketplace_sale",
+                captured_at=base_time + timedelta(days=price),
+            )
+
+        update_current_value_from_latest_snapshot(card_variant=self.variant)
+        self.variant.refresh_from_db()
+
+        self.assertEqual(self.variant.current_value, Decimal("51.50"))
+
+    def test_manual_snapshot_does_not_override_sale_based_current_value(self):
+        sale_time = timezone.now() - timedelta(days=1)
+        PriceSnapshot.objects.create(
+            card_variant=self.variant,
+            price=Decimal("100.00"),
+            currency="EUR",
+            source_name="marketplace_sale",
+            captured_at=sale_time,
+        )
+        record_price_snapshot(
+            card_variant=self.variant,
+            price=Decimal("999.00"),
+            currency="EUR",
+            source_name="manual",
+            captured_at=timezone.now(),
+        )
+        self.variant.refresh_from_db()
+
+        self.assertEqual(self.variant.current_value, Decimal("100.00"))
 
     def test_update_current_value_rejects_variant_without_snapshots(self):
         with self.assertRaises(ValidationError):

@@ -21,6 +21,7 @@ This file tracks frontend work now that `frontend/` is a sibling Django app.
 - [x] The old `My Listings` page now redirects authenticated sellers to the collection listed filter instead of splitting listing management into a separate surface.
 - [x] Collection pages use set-based album books with selected-set pages, filters, and pagination.
 - [x] Catalog, marketplace listings, and collection share the same card/set/shelf browser system.
+- [x] Catalog is now the canonical marketplace browsing page; `/listings/` redirects to catalog with the `Only available` filter enabled.
 - [x] Shared card album entries are compact enough for practical page-by-page scanning.
 - [x] Catalog album card entries use a larger card image and place value on its own row for easier scanning.
 - [x] Catalog album card images and home latest-listing images link to their detail pages.
@@ -33,6 +34,8 @@ This file tracks frontend work now that `frontend/` is a sibling Django app.
 - [x] Reusable kinetic card visual component is shared by card image surfaces across the frontend
 - [x] Kinetic cards subtly scale up and brighten their rainbow glass border on hover/focus
 - [x] Home central showcase displays the most expensive card sold in the current month, with a featured-card fallback when no monthly sale exists
+- [x] Home central showcase copy/card layout is centered as a paired group, with tighter desktop spacing and a centered mobile stack
+- [x] Home latest listings now appear above featured cards, and their browse link opens the shared catalog browser filtered to available cards.
 
 ## Working Rules
 
@@ -51,6 +54,7 @@ This file tracks frontend work now that `frontend/` is a sibling Django app.
 - [x] Add frontend page for authenticated active listing management visibility.
 - [x] Convert collection and active listing management surfaces from flat rows into set album views.
 - [x] Add shared visualization controls for card album, collection book cover, and game shelf views.
+- [x] Add an `Only available` catalog filter for cards with active marketplace listings and route marketplace browsing through it.
 - [x] Move the collection sell action from album cards to the opened card detail page.
 - [x] Show owned active listings inside the card detail `Your Copies` section so selling and monitoring listed copies share one workflow, without exposing another sell form for already-listed copies.
 - [x] Hide sold-out zero-quantity inventory rows from frontend owned collection/detail views while preserving backend listing and purchase history references.
@@ -63,7 +67,9 @@ This file tracks frontend work now that `frontend/` is a sibling Django app.
 - [x] Add regression tests for login session creation and navbar logout behavior.
 - [x] Replace existing catalog/listing/detail/collection card image surfaces with the reusable kinetic card component.
 - [x] Verified monthly home showcase and shared kinetic card rendering with focused frontend tests and browser checks.
+- [x] Verified monthly home showcase desktop and mobile spacing with browser geometry checks.
 - [x] Verified shared browser filter reset behavior with focused frontend regression tests.
 - [x] Verified shared browser anchor preservation with focused frontend regression tests.
 - [x] Verified current browser unification, listed-card overlay, sold-out ownership, and card-detail listing regressions with focused frontend tests.
+- [x] Verified catalog/listings unification and home latest-listings ordering with focused frontend regression tests.
 - [ ] Restore the collection add-physical-inventory flow; current `python manage.py test --keepdb frontend` failures are the photo-backed add inventory tests.

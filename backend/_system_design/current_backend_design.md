@@ -1055,6 +1055,10 @@ Successful purchase steps:
 - Decrease `MarketListing.quantity_available`.
 - If listing availability reaches zero, mark listing `SOLD_OUT`.
 - Mark the order `COMPLETED`.
+- Record a `PriceSnapshot` for the sold card variant using source
+  `marketplace_sale`, the listing unit price, the listing currency, and the
+  order creation time as the captured time.
+- Refresh `CardVariant.current_value` from the newest snapshot.
 
 Failure behavior:
 
@@ -1160,8 +1164,11 @@ Rules:
 Why snapshots are separate from `CardVariant.current_value`:
 
 - `PriceSnapshot` keeps historical evidence.
-- `CardVariant.current_value` stores the latest usable estimate for fast reads.
-- The current value can be recalculated from the newest snapshot.
+- `CardVariant.current_value` stores the estimated value for fast reads.
+- When marketplace sale snapshots exist, the estimated value is the average of
+  the newest 100 `marketplace_sale` prices for that variant.
+- If a variant has no marketplace sale snapshots yet, the current value falls
+  back to the newest available snapshot price.
 
 ### Pricing Services
 
@@ -1171,14 +1178,27 @@ Pricing write and valuation logic lives in `pricing/services.py`.
 
 - Creates a new `PriceSnapshot`.
 - Validates the snapshot before saving.
-- Updates `CardVariant.current_value` by default.
+- Updates `CardVariant.current_value` by default using the recent-sale average
+  rule.
 - Can skip the current-value update for historical imports by passing `update_current_value=False`.
+
+Marketplace sale snapshots:
+
+- Successful marketplace purchases call `record_price_snapshot` from
+  `marketplace.services.purchase_listing`.
+- Existing completed order lines are backfilled into `PriceSnapshot` by
+  `pricing.0002_backfill_marketplace_sale_price_snapshots`.
+- Existing variant current values are recalculated from sale snapshots by
+  `pricing.0003_recalculate_current_value_from_recent_sales`.
 
 `update_current_value_from_latest_snapshot`
 
-- Finds the newest snapshot for a card variant.
+- Keeps its historical name for compatibility, but calculates the estimate from
+  recent marketplace sale snapshots first.
 - Locks the variant row before updating it.
-- Copies the newest snapshot price into `CardVariant.current_value`.
+- Copies the average of the newest 100 `marketplace_sale` prices into
+  `CardVariant.current_value` when sales exist.
+- Falls back to the newest snapshot price when no sale snapshots exist.
 - Raises `ValidationError` if the variant has no snapshots.
 
 `get_variant_price_history`

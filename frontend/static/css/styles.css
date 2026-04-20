@@ -412,9 +412,10 @@ main {
 /* ── KINETIC CARD COMPONENT ── */
 .kinetic-card-preview {
     display: grid;
-    grid-template-columns: minmax(220px, 0.8fr) minmax(260px, 1fr);
+    grid-template-columns: minmax(220px, 360px) minmax(260px, 300px);
+    justify-content: center;
     align-items: center;
-    gap: clamp(28px, 6vw, 88px);
+    gap: clamp(32px, 4vw, 56px);
     margin-top: 40px;
     padding: 10px 0 20px;
 }

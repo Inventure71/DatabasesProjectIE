@@ -664,9 +664,11 @@ Current status:
 - [x] `purchase_listing` writes seller `DECREASE` history and buyer `PURCHASE` history
 - [x] `purchase_listing` decreases listing `quantity_available`
 - [x] `purchase_listing` marks listings `SOLD_OUT` when `quantity_available` reaches zero
+- [x] `purchase_listing` records a `marketplace_sale` `PriceSnapshot` for completed sales and refreshes the variant current value from that sale
 - [x] Failed purchase validations happen inside one transaction and leave order, listing, and inventory state unchanged
 - [x] Verified on 2026-04-20 that purchase workflow tests first failed because `purchase_listing` did not exist
 - [x] Verified on 2026-04-20 that targeted inventory and marketplace purchase tests pass after adding purchase workflow
+- [x] Verified on 2026-04-20 that purchase workflow tests first failed because completed purchases did not create price snapshots, then passed after wiring marketplace purchases into pricing snapshots
 
 ## Phase 13: Buy Endpoint
 
@@ -723,7 +725,7 @@ Steps:
   - source name
   - captured at
 - [x] Create service to insert a price snapshot
-- [x] Create service to update `card_variant.current_value` from the newest snapshot
+- [x] Create service to update `card_variant.current_value` from recent price history
 - [x] Create query logic to read price history for a variant
 - [x] Create query logic to estimate a user collection total value
 
@@ -743,8 +745,14 @@ Current status:
 - [x] Implemented `update_current_value_from_latest_snapshot`
 - [x] Implemented `get_variant_price_history`
 - [x] Implemented `estimate_collection_value`
+- [x] Marketplace purchases now create price snapshots with source `marketplace_sale`
+- [x] `card_variant.current_value` now uses the average of the last 100 `marketplace_sale` prices when sale snapshots exist, with newest snapshot fallback only when there are no sale snapshots yet
+- [x] Existing completed marketplace order lines are backfilled into `PriceSnapshot` by `pricing.0002_backfill_marketplace_sale_price_snapshots`
+- [x] Existing variant current values are recalculated from recent marketplace sale snapshots by `pricing.0003_recalculate_current_value_from_recent_sales`
 - [x] Registered `PriceSnapshot` in Django admin
 - [x] Created `pricing.0001_initial`
+- [x] Created `pricing.0002_backfill_marketplace_sale_price_snapshots`
+- [x] Created `pricing.0003_recalculate_current_value_from_recent_sales`
 - [x] Verified on 2026-04-20 that pricing tests first failed because `PriceSnapshot` did not exist
 - [x] Verified on 2026-04-20 that `python manage.py check` and `python manage.py test pricing` pass after adding the pricing model and services
 - [x] Verified on 2026-04-20 that full backend verification passes: `python manage.py check`, `python manage.py makemigrations --check --dry-run`, `python manage.py migrate --check`, and `python manage.py test common catalog users inventory marketplace pricing`

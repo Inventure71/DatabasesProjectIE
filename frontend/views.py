@@ -33,7 +33,6 @@ from frontend.services.catalog_service import (
 )
 from frontend.services.listing_service import (
     get_listing,
-    get_listing_facets,
     list_listings,
 )
 
@@ -84,6 +83,7 @@ def catalog(request):
             "rarities": facets["rarities"],
             "languages": facets["languages"],
             "selected_rarities": request.GET.getlist("rarity"),
+            "selected_available": request.GET.get("available") == "1",
         },
     )
 
@@ -145,28 +145,10 @@ def card_detail(request, card_id):
 
 
 def listings(request):
-    facets = get_listing_facets()
-    listings_result = list_listings(request.GET)
-
-    return render(
-        request,
-        "listings.html",
-        {
-            "listings": listings_result,
-            "browser": build_record_browser(
-                listings_result,
-                request.GET,
-                mode="listings",
-                default_view=CARD_VIEW,
-            ),
-            "total_listings": facets["total_listings"],
-            "games": facets["games"],
-            "sets": facets["sets"],
-            "rarities": facets["rarities"],
-            "languages": facets["languages"],
-            "selected_rarities": request.GET.getlist("rarity"),
-        },
-    )
+    query = request.GET.copy()
+    query["available"] = "1"
+    query.pop("sort", None)
+    return redirect(f"{reverse('catalog')}?{query.urlencode()}#browser")
 
 
 @login_required(login_url="login")
