@@ -5,7 +5,7 @@ from tempfile import TemporaryDirectory
 
 from django.contrib import admin
 from django.core.exceptions import ValidationError
-from django.core.management import call_command
+from django.core.management import call_command, CommandError
 from django.db import IntegrityError, models, transaction
 from django.test import TestCase
 from django.urls import reverse
@@ -169,6 +169,139 @@ class ImportPokemonCardsDatasetCommandTests(TestCase):
         self.assertEqual(jolteon_variant.set, jungle_set)
         self.assertEqual(jolteon_variant.collector_number, "4/64")
         self.assertEqual(jolteon_variant.finish, CardVariant.Finish.HOLO)
+
+    def test_default_import_skips_sets_outside_curated_scope(self):
+        with TemporaryDirectory() as directory:
+            csv_path = Path(directory) / "pokemon-cards.csv"
+            csv_path.write_text(
+                "\n".join(
+                    [
+                        "id,image_url,caption,name,hp,set_name",
+                        (
+                            "base1-4,https://example.com/charizard.png,"
+                            "\"A Stage 2 Pokemon Card of type Fire with the title Charizard and 120 HP "
+                            "of rarity Rare Holo evolved from Charmeleon from the set Base.\","
+                            "Charizard,120,Base"
+                        ),
+                        (
+                            "pl3-1,https://example.com/absol.png,"
+                            "\"A Basic Pokemon Card of type Darkness with the title Absol G and 70 HP "
+                            "of rarity Rare Holo from the set Supreme Victors.\","
+                            "Absol G,70,Supreme Victors"
+                        ),
+                    ]
+                ),
+                encoding="utf-8",
+            )
+            output = StringIO()
+
+            call_command("import_pokemon_cards_dataset", str(csv_path), stdout=output)
+
+        self.assertEqual(CardSet.objects.count(), 2)
+        self.assertTrue(CardSet.objects.filter(code="BASE").exists())
+        self.assertTrue(CardSet.objects.filter(code="JUNGLE").exists())
+        self.assertFalse(CardSet.objects.filter(name="Supreme Victors").exists())
+        self.assertFalse(Card.objects.filter(name="Absol G").exists())
+        self.assertIn("Skipped 1 row(s)", output.getvalue())
+
+    def test_all_source_sets_imports_every_dataset_set_repeatably(self):
+        with TemporaryDirectory() as directory:
+            csv_path = Path(directory) / "pokemon-cards.csv"
+            csv_path.write_text(
+                "\n".join(
+                    [
+                        "id,image_url,caption,name,hp,set_name",
+                        (
+                            "base1-4,https://example.com/charizard.png,"
+                            "\"A Stage 2 Pokemon Card of type Fire with the title Charizard and 120 HP "
+                            "of rarity Rare Holo evolved from Charmeleon from the set Base.\","
+                            "Charizard,120,Base"
+                        ),
+                        (
+                            "pl3-1,https://example.com/absol.png,"
+                            "\"A Basic Pokemon Card of type Darkness with the title Absol G and 70 HP "
+                            "of rarity Rare Holo from the set Supreme Victors.\","
+                            "Absol G,70,Supreme Victors"
+                        ),
+                        (
+                            "pl3-153,https://example.com/pikachu.png,"
+                            "\"A Basic Pokemon Card of type Lightning with the title Pikachu and 60 HP "
+                            "of rarity Common from the set Supreme Victors.\","
+                            "Pikachu,60,Supreme Victors"
+                        ),
+                        (
+                            "ecard2-H1,https://example.com/umbreon.png,"
+                            "\"A Stage 1 Pokemon Card of type Darkness with the title Umbreon and 80 HP "
+                            "of rarity Rare Holo from the set Aquapolis.\","
+                            "Umbreon,80,Aquapolis"
+                        ),
+                        (
+                            "ecard2-H32,https://example.com/espeon.png,"
+                            "\"A Stage 1 Pokemon Card of type Psychic with the title Espeon and 80 HP "
+                            "of rarity Rare Holo from the set Aquapolis.\","
+                            "Espeon,80,Aquapolis"
+                        ),
+                    ]
+                ),
+                encoding="utf-8",
+            )
+            output = StringIO()
+
+            call_command("import_pokemon_cards_dataset", str(csv_path), "--all-source-sets", stdout=output)
+            call_command("import_pokemon_cards_dataset", str(csv_path), "--all-source-sets", stdout=output)
+
+        game = CardGame.objects.get(slug="pokemon")
+        base_set = CardSet.objects.get(game=game, code="BASE")
+        aquapolis = CardSet.objects.get(game=game, code="AQUAPOLIS")
+        supreme_victors = CardSet.objects.get(game=game, code="SUPREME_VICTORS")
+
+        self.assertEqual(CardSet.objects.count(), 3)
+        self.assertEqual(Card.objects.count(), 5)
+        self.assertEqual(CardVariant.objects.count(), 5)
+        self.assertEqual(CardImage.objects.count(), 5)
+        self.assertEqual(aquapolis.name, "Aquapolis")
+        self.assertEqual(base_set.name, "Base Set")
+        self.assertEqual(supreme_victors.name, "Supreme Victors")
+        self.assertEqual(
+            CardVariant.objects.get(card__name="Umbreon").collector_number,
+            "H1/32",
+        )
+        self.assertEqual(
+            CardVariant.objects.get(card__name="Absol G").collector_number,
+            "1/153",
+        )
+        self.assertEqual(
+            CardVariant.objects.get(card__name="Pikachu").collector_number,
+            "153/153",
+        )
+        self.assertIn("Skipped 0 row(s)", output.getvalue())
+
+    def test_all_source_sets_cannot_be_combined_with_specific_set_filters(self):
+        with TemporaryDirectory() as directory:
+            csv_path = Path(directory) / "pokemon-cards.csv"
+            csv_path.write_text(
+                "\n".join(
+                    [
+                        "id,image_url,caption,name,hp,set_name",
+                        (
+                            "base1-4,https://example.com/charizard.png,"
+                            "\"A Stage 2 Pokemon Card of type Fire with the title Charizard and 120 HP "
+                            "of rarity Rare Holo evolved from Charmeleon from the set Base.\","
+                            "Charizard,120,Base"
+                        ),
+                    ]
+                ),
+                encoding="utf-8",
+            )
+
+            with self.assertRaisesMessage(CommandError, "Choose either --all-source-sets or --source-set-name"):
+                call_command(
+                    "import_pokemon_cards_dataset",
+                    str(csv_path),
+                    "--all-source-sets",
+                    "--source-set-name",
+                    "Base",
+                )
 
 
 class CatalogAdminTests(TestCase):

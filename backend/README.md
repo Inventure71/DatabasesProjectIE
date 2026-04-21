@@ -67,4 +67,15 @@ source .venv/bin/activate
 python manage.py import_pokemon_cards_dataset
 ```
 
-The command is repeatable. Running it again updates the same imported rows instead of duplicating them.
+By default, the importer loads the curated Base and Jungle subset used for the
+MVP demo. To import every `set_name` present in the CSV, run:
+
+```bash
+source .venv/bin/activate
+python manage.py import_pokemon_cards_dataset --all-source-sets
+```
+
+The command is repeatable. Running it again updates the same imported rows
+instead of duplicating them. In all-set mode, set codes and collector-number
+denominators are inferred for sets that are not part of the curated Base/Jungle
+mapping, while alphanumeric collector numbers such as `H1` are preserved.
