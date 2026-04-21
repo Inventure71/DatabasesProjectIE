@@ -53,7 +53,37 @@
         </div>
  
         {% if user.is_authenticated %}
-            <a href="{% url 'catalog' %}?available=1&q={{ card.name|urlencode }}#browser" class="btn btn-gold detail-buy-btn">Browse Listings for this Card</a>
+            <div class="detail-action-stack">
+                <a href="{% url 'catalog' %}?available=1&q={{ card.name|urlencode }}#browser" class="btn btn-gold detail-buy-btn">Browse Listings for this Card</a>
+
+                {% if card.variant_id %}
+                    <details class="detail-own-card">
+                        <summary class="btn btn-outline-gold detail-own-card__summary">Own this card?</summary>
+                        <div class="detail-own-card__panel">
+                            <h2 class="detail-own-card__title">Own this card?</h2>
+                            <p class="detail-own-card__copy">Add a copy you already own to your collection.</p>
+                            <form class="detail-add-collection-form" method="post" action="{% url 'add_to_collection' %}">
+                                {% csrf_token %}
+                                <input type="hidden" name="card_id" value="{{ card.id }}">
+                                <input type="hidden" name="card_variant_id" value="{{ card.variant_id }}">
+                                <label class="collection-sell-form__field">
+                                    <span>Condition</span>
+                                    <select class="form-select" name="condition" required>
+                                        {% for value, label in inventory_condition_choices %}
+                                            <option value="{{ value }}">{{ label }}</option>
+                                        {% endfor %}
+                                    </select>
+                                </label>
+                                <label class="collection-sell-form__field">
+                                    <span>Qty</span>
+                                    <input class="form-input form-input--sm" type="number" name="quantity" value="1" min="1" required>
+                                </label>
+                                <button type="submit" class="btn btn-gold btn-sm">Add to Collection</button>
+                            </form>
+                        </div>
+                    </details>
+                {% endif %}
+            </div>
         {% else %}
             <a href="{% url 'login' %}" class="btn btn-outline-gold detail-buy-btn">Login to Buy</a>
         {% endif %}
@@ -64,6 +94,18 @@
 {% if listed_id %}
     <div class="collection-alert collection-alert--success">
         Listing created. Your copy is now available in the marketplace.
+    </div>
+{% endif %}
+
+{% if added_id %}
+    <div class="collection-alert collection-alert--success">
+        Card added to your collection.
+    </div>
+{% endif %}
+
+{% if add_error %}
+    <div class="collection-alert collection-alert--error">
+        Choose a valid condition and quantity before adding this card.
     </div>
 {% endif %}
 

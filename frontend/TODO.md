@@ -15,8 +15,9 @@ This file tracks frontend work now that `frontend/` is a sibling Django app.
 - [x] Home featured cards and latest listings are limited in the database before rendering
 - [x] Listing detail buy form now uses the backend purchase workflow
 - [x] Authenticated users can view their collection, estimated value, owned quantities, available stock, and reserved stock
+- [x] Authenticated users can add a card they already own from the card detail page through an `Own this card?` secondary action.
 - [x] Authenticated users can create sale listings from owned inventory on the card detail page, after opening a card from the collection album
-- [x] The collection page now owns listed-inventory discovery: listed cards stay in the collection grid with a strong gray image treatment, an over-image listed badge, and a `My Listings` filter.
+- [x] The collection page now owns listed-inventory discovery: collection cards show owned/listed quantity pills, partially listed buckets keep the normal image treatment, and fully listed buckets use the strong gray image treatment.
 - [x] Active listing cards use "Listed by" language so listed inventory is not confused with completed sales
 - [x] The old `My Listings` page now redirects authenticated sellers to the collection listed filter instead of splitting listing management into a separate surface.
 - [x] Collection pages use set-based album books with selected-set pages, filters, and pagination.
@@ -71,5 +72,7 @@ This file tracks frontend work now that `frontend/` is a sibling Django app.
 - [x] Verified shared browser filter reset behavior with focused frontend regression tests.
 - [x] Verified shared browser anchor preservation with focused frontend regression tests.
 - [x] Verified current browser unification, listed-card overlay, sold-out ownership, and card-detail listing regressions with focused frontend tests.
+- [x] Verified partial-versus-full listed collection card treatment with focused frontend regression tests.
 - [x] Verified catalog/listings unification and home latest-listings ordering with focused frontend regression tests.
 - [x] Restore the collection add-inventory POST flow using the aggregate inventory model; duplicate owner/card/condition additions merge into one quantity bucket.
+- [x] Add a dedicated `POST /collection/add/` route and card-detail `Own this card?` disclosure for adding owned cards without asking for purchase price.

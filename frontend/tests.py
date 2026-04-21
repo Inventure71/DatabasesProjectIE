@@ -466,7 +466,7 @@ class FrontendBackendApiWiringTests(TestCase):
         self.assertContains(default_response, 'class="collection-book-shelf"')
         self.assertContains(default_response, "Collection Book Cover")
 
-    def test_collection_page_marks_and_filters_cards_with_active_listings(self):
+    def test_collection_page_marks_partial_listings_without_gray_overlay(self):
         unlisted_card = Card.objects.create(game=self.game, name="Binder Turtle")
         unlisted_variant = CardVariant.objects.create(
             card=unlisted_card,
@@ -497,15 +497,56 @@ class FrontendBackendApiWiringTests(TestCase):
         self.assertContains(response, "Backend Dragon")
         self.assertContains(response, "Binder Turtle")
         self.assertContains(response, "Listed")
+        self.assertContains(response, "3 owned")
+        self.assertContains(response, "1 owned")
         self.assertContains(response, "2 listed")
-        self.assertContains(response, "album-card-slot--listed")
-        self.assertContains(response, "album-card-sleeve__badge")
+        self.assertNotContains(response, "album-card-slot--listed")
+        self.assertContains(response, "album-card-sleeve__pills")
+        self.assertContains(response, "album-card-sleeve__pill--owned")
+        self.assertContains(response, "album-card-sleeve__pill--listed")
         self.assertNotContains(response, "album-card-sleeve__listing")
 
         self.assertEqual(listed_response.status_code, 200)
         self.assertContains(listed_response, "Backend Dragon")
+        self.assertContains(listed_response, "3 owned")
         self.assertContains(listed_response, "2 listed")
         self.assertNotContains(listed_response, "Binder Turtle")
+
+    def test_collection_page_grays_out_fully_listed_inventory(self):
+        fully_listed_card = Card.objects.create(game=self.game, name="Fully Listed Owl")
+        fully_listed_variant = CardVariant.objects.create(
+            card=fully_listed_card,
+            set=self.card_set,
+            collector_number="3/99",
+            rarity=CardVariant.Rarity.COMMON,
+            current_value=Decimal("11.00"),
+        )
+        CardImage.objects.create(
+            card_variant=fully_listed_variant,
+            image_url="https://example.com/fully-listed-owl.png",
+        )
+        inventory_item = add_inventory_item(
+            owner=self.seller,
+            card_variant=fully_listed_variant,
+            condition=InventoryItem.Condition.NEAR_MINT,
+            quantity=2,
+            actor=self.seller,
+        )
+        create_listing(
+            seller=self.seller,
+            inventory_item=inventory_item,
+            quantity=2,
+            unit_price=Decimal("15.00"),
+        )
+        self.client.force_login(self.seller)
+
+        response = self.client.get(reverse("collection"), {"view": "card", "q": "Fully Listed Owl"})
+
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, "Fully Listed Owl")
+        self.assertContains(response, "album-card-slot--listed")
+        self.assertContains(response, "2 owned")
+        self.assertContains(response, "2 listed")
 
     def test_collection_listed_filter_uses_album_filters_for_active_listings(self):
         jungle_set = CardSet.objects.create(game=self.game, name="Jungle", code="JUNG")
@@ -563,6 +604,83 @@ class FrontendBackendApiWiringTests(TestCase):
         self.assertContains(response, "Backend Dragon")
         self.assertContains(response, "frontend-test")
         self.assertContains(response, "frontend-seller")
+
+    def test_card_detail_exposes_add_to_collection_without_purchase_price(self):
+        self.client.force_login(self.buyer)
+
+        response = self.client.get(reverse("card_detail", kwargs={"card_id": self.card.pk}))
+
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, "Own this card?")
+        self.assertContains(response, "Add a copy you already own to your collection.")
+        self.assertContains(response, "detail-own-card__summary")
+        self.assertContains(response, "detail-own-card__panel")
+        self.assertContains(response, "Add to Collection")
+        self.assertContains(response, f'action="{reverse("add_to_collection")}"')
+        self.assertContains(response, f'name="card_variant_id" value="{self.variant.id}"')
+        self.assertContains(response, 'name="condition"')
+        self.assertContains(response, 'name="quantity"')
+        self.assertNotContains(response, 'name="purchase_price"')
+
+    def test_add_to_collection_post_creates_owned_inventory_from_card_detail(self):
+        self.client.force_login(self.buyer)
+
+        response = self.client.post(
+            reverse("add_to_collection"),
+            {
+                "card_id": str(self.card.id),
+                "card_variant_id": str(self.variant.id),
+                "condition": InventoryItem.Condition.LIGHTLY_PLAYED,
+                "quantity": "2",
+            },
+        )
+
+        added_item = InventoryItem.objects.get(
+            owner=self.buyer,
+            card_variant=self.variant,
+            condition=InventoryItem.Condition.LIGHTLY_PLAYED,
+        )
+        self.assertRedirects(
+            response,
+            f"{reverse('card_detail', kwargs={'card_id': self.card.pk})}?added={added_item.id}",
+        )
+        self.assertEqual(added_item.quantity, 2)
+        self.assertIsNone(added_item.purchase_price)
+
+    def test_add_to_collection_post_merges_existing_inventory_bucket(self):
+        existing_item = add_inventory_item(
+            owner=self.buyer,
+            card_variant=self.variant,
+            condition=InventoryItem.Condition.NEAR_MINT,
+            quantity=1,
+            actor=self.buyer,
+        )
+        self.client.force_login(self.buyer)
+
+        response = self.client.post(
+            reverse("add_to_collection"),
+            {
+                "card_id": str(self.card.id),
+                "card_variant_id": str(self.variant.id),
+                "condition": InventoryItem.Condition.NEAR_MINT,
+                "quantity": "3",
+            },
+        )
+
+        existing_item.refresh_from_db()
+        self.assertRedirects(
+            response,
+            f"{reverse('card_detail', kwargs={'card_id': self.card.pk})}?added={existing_item.id}",
+        )
+        self.assertEqual(existing_item.quantity, 4)
+        self.assertEqual(
+            InventoryItem.objects.filter(
+                owner=self.buyer,
+                card_variant=self.variant,
+                condition=InventoryItem.Condition.NEAR_MINT,
+            ).count(),
+            1,
+        )
 
     def test_card_detail_allows_owner_to_create_listing_from_owned_inventory(self):
         unlisted_inventory = add_inventory_item(

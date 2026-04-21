@@ -1335,6 +1335,69 @@ a.card-tile {
     font-size: 0.95rem;
 }
 
+.detail-action-stack {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) auto;
+    align-items: start;
+    gap: 12px;
+}
+
+.detail-own-card {
+    position: relative;
+}
+
+.detail-own-card__summary {
+    min-height: 47px;
+    justify-content: center;
+    list-style: none;
+    cursor: pointer;
+}
+
+.detail-own-card__summary::-webkit-details-marker {
+    display: none;
+}
+
+.detail-own-card__panel {
+    position: absolute;
+    top: calc(100% + 10px);
+    right: 0;
+    z-index: 5;
+    width: min(380px, calc(100vw - 48px));
+    padding: 16px;
+    background: rgba(17,19,25,0.98);
+    border: 1px solid var(--border-accent);
+    border-radius: var(--radius-sm);
+    box-shadow: var(--shadow-lg);
+}
+
+.detail-own-card__title {
+    margin: 0 0 6px;
+    color: var(--text-primary);
+    font-family: 'Cinzel', serif;
+    font-size: 1rem;
+}
+
+.detail-own-card__copy {
+    margin: 0 0 14px;
+    color: var(--text-secondary);
+    font-size: 0.84rem;
+    line-height: 1.45;
+}
+
+.detail-add-collection-form {
+    display: grid;
+    grid-template-columns: minmax(150px, 1fr) 84px;
+    align-items: end;
+    gap: 10px;
+}
+
+.detail-add-collection-form .btn {
+    grid-column: 1 / -1;
+    min-height: 38px;
+    justify-content: center;
+    white-space: nowrap;
+}
+
 .owned-copy-list {
     display: flex;
     flex-direction: column;
@@ -2273,13 +2336,22 @@ a.card-tile {
     width: 100%;
 }
 
-.album-card-sleeve__badge {
+.album-card-sleeve__pills {
     position: absolute;
     top: 8px;
     left: 50%;
     z-index: 2;
-    display: inline-flex;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 4px;
     max-width: calc(100% - 14px);
+    transform: translateX(-50%);
+}
+
+.album-card-sleeve__pill {
+    display: inline-flex;
+    max-width: 100%;
     padding: 4px 8px;
     color: var(--text-primary);
     background: rgba(12,13,15,0.86);
@@ -2291,8 +2363,13 @@ a.card-tile {
     line-height: 1.2;
     text-align: center;
     text-transform: uppercase;
-    transform: translateX(-50%);
     white-space: nowrap;
+}
+
+.album-card-sleeve__pill--listed {
+    background: rgba(160,158,152,0.88);
+    border-color: rgba(235,232,224,0.48);
+    color: #101114;
 }
 
 .album-card-sleeve__caption {
@@ -2440,6 +2517,9 @@ a.card-tile {
     .owned-copy-row__form {
         grid-template-columns: 1fr 1fr auto;
     }
+    .detail-add-collection-form {
+        grid-template-columns: 1fr 96px;
+    }
     .listing-row {
         grid-template-columns: 60px 1fr auto;
         grid-template-rows: auto auto;
@@ -2484,6 +2564,20 @@ a.card-tile {
     }
     .owned-copy-row__form {
         grid-template-columns: 1fr 1fr;
+    }
+    .detail-add-collection-form {
+        grid-template-columns: 1fr;
+    }
+    .detail-action-stack {
+        grid-template-columns: 1fr;
+    }
+    .detail-own-card__summary {
+        width: 100%;
+    }
+    .detail-own-card__panel {
+        position: static;
+        width: 100%;
+        margin-top: 10px;
     }
     .owned-copy-row__form .btn {
         grid-column: 1 / -1;
