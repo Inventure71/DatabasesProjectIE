@@ -41,6 +41,7 @@ Current backend wiring:
 - Listing detail purchases call the backend marketplace purchase workflow.
 - The collection page reads authenticated inventory and collection valuation data through `frontend.services.backend_api`.
 - The collection add-inventory POST flow uses the backend aggregate inventory service. Adding the same card variant in the same condition increases the existing inventory quantity instead of creating a separate physical-copy row.
+- Card detail pages expose add-to-collection as a secondary `Own this card?` disclosure for authenticated users. Opening it reveals the owned-copy form, which posts card variant id, condition, and quantity to `/collection/add/`; it intentionally does not collect purchase price.
 - Collection sell forms call the marketplace listing service through `create_marketplace_listing_for_user`, so stock reservation and ownership validation stay in the backend service layer.
 - The legacy `/listings/` route is retained as a compatibility entry point, but
   it redirects to `/catalog/?available=1#browser` instead of rendering a
@@ -55,9 +56,10 @@ Current frontend UI boundary:
 
 - Catalog/listing/home/detail pages are wired to real backend data.
 - `/collection/` is an authenticated frontend page for owned inventory, estimated value, listed-inventory discovery, and opening owned cards as an album.
+- `/collection/add/` is the dedicated authenticated POST endpoint for adding catalog/card-detail items to the current user's aggregate inventory buckets.
 - Card detail pages own the listing-creation UI for authenticated owners. A user opens a card from the collection album, chooses one of their owned copies, and submits inventory item id, quantity, and price from that card-specific page.
 - `/my-listings/` is retained as a compatibility route, but authenticated users are redirected to `/collection/?view=card&my_listings=listed#browser`.
-- Listed inventory is treated as collection state, not a separate top-level area. Collection cards with active listings remain visible in the collection browser with a strong gray listed treatment and an over-image listed-count badge, and the collection sidebar includes a `My Listings` filter for listed-only inventory.
+- Listed inventory is treated as collection state, not a separate top-level area. Collection cards show over-image quantity pills for owned count and, when applicable, listed count. Partially listed inventory keeps the normal card image treatment because some owned units are still unlisted. Fully listed inventory uses the strong gray listed treatment because every owned unit in that inventory bucket is committed to active listings. The collection sidebar includes a `My Listings` filter for listed-only inventory.
 - Frontend owned-inventory views intentionally exclude zero-quantity `InventoryItem` rows. Sold-out rows remain in the database so protected marketplace listing and purchase-history references stay intact, but they no longer appear as owned cards.
 - The collection page presents inventory as set-based albums.
   The view still receives flat backend-backed inventory/listing records, but

@@ -8,6 +8,8 @@ from django.shortcuts import redirect, render
 from django.urls import reverse
 from django.views.decorators.http import require_POST
 
+from inventory.models import InventoryItem
+
 from frontend.services.album_service import (
     CARD_VIEW,
     SET_VIEW,
@@ -139,8 +141,11 @@ def card_detail(request, card_id):
             "price_history": build_price_history(card),
             "similar_cards": list_similar_cards(card),
             "owned_inventory_items": owned_inventory_items,
+            "inventory_condition_choices": InventoryItem.Condition.choices,
             "sell_error": sell_error,
             "listed_id": request.GET.get("listed"),
+            "added_id": request.GET.get("added"),
+            "add_error": request.GET.get("add_error"),
         },
     )
 
@@ -150,6 +155,41 @@ def listings(request):
     query["available"] = "1"
     query.pop("sort", None)
     return redirect(f"{reverse('catalog')}?{query.urlencode()}#browser")
+
+
+@login_required(login_url="login")
+@require_POST
+def add_to_collection(request):
+    try:
+        card_id = int(request.POST.get("card_id", ""))
+        card_variant_id = int(request.POST.get("card_variant_id", ""))
+        quantity = int(request.POST.get("quantity", ""))
+    except (TypeError, ValueError):
+        return _redirect_card_add_error(request.POST.get("card_id"))
+
+    card = get_card(card_id)
+    if not card or card.get("variant_id") != card_variant_id:
+        return _redirect_card_add_error(card_id)
+
+    try:
+        item = add_inventory_item_for_user(
+            user=request.user,
+            card_variant_id=card_variant_id,
+            condition=request.POST.get("condition", ""),
+            quantity=quantity,
+        )
+    except ValidationError:
+        return _redirect_card_add_error(card_id)
+
+    return redirect(f"{reverse('card_detail', kwargs={'card_id': card_id})}?added={item['id']}")
+
+
+def _redirect_card_add_error(card_id):
+    try:
+        card_id = int(card_id)
+    except (TypeError, ValueError):
+        return redirect("catalog")
+    return redirect(f"{reverse('card_detail', kwargs={'card_id': card_id})}?add_error=1")
 
 
 @login_required(login_url="login")
