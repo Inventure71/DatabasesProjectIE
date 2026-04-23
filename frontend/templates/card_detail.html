@@ -1,7 +1,7 @@
 {% extends "base.html" %}
 {% load static %}
  
-{% block title %}{{ card.name }} — Card Marketplace{% endblock %}
+{% block title %}{{ card.name }} — TCGNET{% endblock %}
  
 {% block content %}
  
@@ -118,7 +118,10 @@
 {% if user.is_authenticated %}
 <section class="section">
     <div class="section__header">
-        <h2 class="section__title">Your Copies</h2>
+        <div class="section-title-row">
+            <h2 class="section__title">Your Copies</h2>
+            {% include "components/query_explainer.html" with explainer=query_explainers.your_copies only %}
+        </div>
     </div>
 
     {% if owned_inventory_items %}
@@ -176,7 +179,10 @@
 <!-- ACTIVE LISTINGS -->
 <section class="section">
     <div class="section__header">
-        <h2 class="section__title">Active Listings</h2>
+        <div class="section-title-row">
+            <h2 class="section__title">Active Listings</h2>
+            {% include "components/query_explainer.html" with explainer=query_explainers.active_listings only %}
+        </div>
     </div>
  
     {% if active_listings %}
@@ -221,7 +227,10 @@
 <!-- PRICE HISTORY -->
 <section class="section">
     <div class="section__header">
-        <h2 class="section__title">Price History</h2>
+        <div class="section-title-row">
+            <h2 class="section__title">Price History</h2>
+            {% include "components/query_explainer.html" with explainer=query_explainers.price_history only %}
+        </div>
     </div>
  
     {% if price_history %}
@@ -256,7 +265,10 @@
 <!-- SIMILAR CARDS -->
 <section class="section">
     <div class="section__header">
-        <h2 class="section__title">Similar Cards</h2>
+        <div class="section-title-row">
+            <h2 class="section__title">Similar Cards</h2>
+            {% include "components/query_explainer.html" with explainer=query_explainers.similar_cards only %}
+        </div>
     </div>
  
     {% if similar_cards %}

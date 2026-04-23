@@ -21,6 +21,7 @@ Current service modules:
 - `frontend.services.backend_api`
 - `frontend.services.catalog_service`
 - `frontend.services.listing_service`
+- `frontend.services.query_explainers`
 
 These services now use real backend-backed data contracts. Because the frontend
 and backend run in the same Django process, server-rendered pages do not make
@@ -32,7 +33,7 @@ Current backend wiring:
 
 - Catalog pages read real `Card`, `CardVariant`, `CardSet`, and `CardImage` data.
 - Catalog pages request paginated service results so large catalogs are sliced by the database before template rendering.
-- The home page requests only the featured cards and latest listings it displays instead of loading every row first.
+- The home page requests only the featured top-sold cards and latest listings it displays instead of loading every row first.
 - The catalog page is the canonical card browsing surface. Marketplace browsing
   is represented as the same catalog browser with `available=1`, which filters
   cards down to variants that have active, quantity-available marketplace
@@ -46,7 +47,10 @@ Current backend wiring:
 - The legacy `/listings/` route is retained as a compatibility entry point, but
   it redirects to `/catalog/?available=1#browser` instead of rendering a
   separate marketplace browser.
-- The home page monthly showcase reads completed `PurchaseOrderLine` rows and displays the highest unit-price card sold during the current calendar month. If there are no completed sales in the current month, it falls back to the first featured catalog card.
+- The home page monthly showcase reads completed `PurchaseOrderLine` rows and displays the highest unit-price card sold during the current calendar month.
+- The home page Featured Cards section reads completed `PurchaseOrderLine`
+  rows from the current calendar month, groups them by `CardVariant`, and
+  displays up to six variants ordered by quantity sold, then total sales value.
 - The home page monthly showcase uses a centered two-column content group on desktop so the sale copy stays visually paired with the kinetic card instead of drifting toward the left edge. On mobile, the same showcase stacks with centered copy above the card.
 - `frontend.services.backend_api` exposes service wrappers for current user,
   inventory management, marketplace listing creation, marketplace purchases,
@@ -110,6 +114,16 @@ Current frontend UI boundary:
 - On the home page, latest active listings appear above featured catalog cards.
   The latest-listings browse link opens the catalog browser with `available=1`
   so listed cards and catalog cards use one shared page.
+- Database-backed frontend sections can render a reusable `?` query explainer
+  beside their visible section title or value label. The explainer data lives
+  in `frontend.services.query_explainers`; page views choose the relevant keys
+  and templates render them through
+  `frontend/templates/components/query_explainer.html`. Each popup names the
+  frontend service path, the main tables touched, the filtering/sorting steps,
+  and the rough ORM shape. The current coverage includes home monthly sale,
+  home latest listings, home featured cards, catalog browsing, card-detail
+  owned copies, card-detail active listings, price history, similar cards,
+  collection summary, collection browser, and listing detail.
 - `frontend/templates/components/kinetic_card.html` owns the reusable physical-card visual treatment. It renders only the card surface so existing page components can decide whether the card is linked, listed, or surrounded by metadata.
 - `frontend/static/js/kinetic-card.js` progressively enhances elements marked with `data-kinetic-card`; without JavaScript the card remains a normal image surface. The `data-kinetic-card` element is the stable pointer hitbox, while the nested `.kinetic-card__tilt` layer receives the 3D transform so corner pointer math does not reset when the card tilts.
 - Card catalog tiles, listing cards, listing rows, detail pages, collection rows, active listing rows, similar cards, and the home monthly showcase all reuse `kinetic_card.html` for visual card rendering.

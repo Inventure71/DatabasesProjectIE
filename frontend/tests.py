@@ -233,6 +233,39 @@ class FrontendBackendApiWiringTests(TestCase):
         self.assertLess(content.index("Latest Listings"), content.index("Featured Cards"))
         self.assertContains(response, f'href="{reverse("catalog")}?available=1#browser"')
 
+    def test_database_query_explainers_render_on_backend_backed_pages(self):
+        self.client.force_login(self.seller)
+
+        responses = [
+            self.client.get(reverse("home")),
+            self.client.get(reverse("catalog"), {"q": "Backend Dragon", "available": "1"}),
+            self.client.get(reverse("card_variant_detail", kwargs={"variant_id": self.variant.pk})),
+            self.client.get(reverse("collection"), {"view": "card"}),
+            self.client.get(reverse("listing_detail", kwargs={"listing_id": self.listing.pk})),
+        ]
+
+        for response in responses:
+            self.assertEqual(response.status_code, 200)
+            self.assertContains(response, 'data-query-help-open')
+            self.assertContains(response, "Database query walkthrough")
+
+        self.assertContains(responses[0], "Latest listings query")
+        self.assertContains(responses[0], "Featured cards query")
+        self.assertContains(responses[1], "Catalog browser query")
+        self.assertContains(responses[2], "Your copies query")
+        self.assertContains(responses[2], "Card active listings query")
+        self.assertContains(responses[2], "Price history query")
+        self.assertContains(responses[2], "Similar cards query")
+        self.assertContains(responses[3], "Collection summary query")
+        self.assertContains(responses[3], "Owned inventory browser query")
+        self.assertContains(responses[4], "Listing detail query")
+
+    def test_query_explainer_javascript_is_loaded_inline(self):
+        response = self.client.get(reverse("home"))
+
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, "queryHelpOpen")
+
     def test_home_page_showcases_most_expensive_card_sold_this_month(self):
         old_expensive_sale = purchase_listing(
             buyer=self.buyer,

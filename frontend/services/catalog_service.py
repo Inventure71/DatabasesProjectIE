@@ -1,5 +1,5 @@
 from django.core.paginator import Paginator
-from django.db.models import Exists, OuterRef
+from django.db.models import DecimalField, Exists, ExpressionWrapper, F, OuterRef, Sum
 from django.utils import timezone
 
 from catalog.models import Card, CardGame, CardSet, CardVariant
@@ -32,6 +32,16 @@ def _available_only(params):
     return params.get("available", "") in {"1", "true", "on", "yes"}
 
 
+def _current_month_bounds():
+    now = timezone.localtime()
+    month_start = now.replace(day=1, hour=0, minute=0, second=0, microsecond=0)
+    if month_start.month == 12:
+        next_month_start = month_start.replace(year=month_start.year + 1, month=1)
+    else:
+        next_month_start = month_start.replace(month=month_start.month + 1)
+    return month_start, next_month_start
+
+
 def list_cards(params, *, limit=None):
     queryset = _filter_and_sort_display_variants(params)
     if limit is not None:
@@ -39,13 +49,42 @@ def list_cards(params, *, limit=None):
     return [_variant_to_frontend_card(variant) for variant in queryset]
 
 
+def list_top_sold_cards_this_month(*, limit=6):
+    month_start, next_month_start = _current_month_bounds()
+    sale_total = ExpressionWrapper(
+        F("quantity") * F("unit_price"),
+        output_field=DecimalField(max_digits=12, decimal_places=2),
+    )
+
+    sold_rows = list(
+        PurchaseOrderLine.objects.filter(
+            purchase_order__status=PurchaseOrder.Status.COMPLETED,
+            purchase_order__created_at__gte=month_start,
+            purchase_order__created_at__lt=next_month_start,
+        )
+        .values("card_variant_id")
+        .annotate(
+            sold_quantity=Sum("quantity"),
+            sales_total=Sum(sale_total),
+        )
+        .order_by("-sold_quantity", "-sales_total", "card_variant_id")[:limit]
+    )
+
+    variant_ids = [row["card_variant_id"] for row in sold_rows]
+    variants_by_id = {
+        variant.id: variant
+        for variant in _display_variant_queryset().filter(pk__in=variant_ids)
+    }
+
+    return [
+        _variant_to_frontend_card(variants_by_id[variant_id])
+        for variant_id in variant_ids
+        if variant_id in variants_by_id
+    ]
+
+
 def get_most_expensive_card_sold_this_month():
-    now = timezone.localtime()
-    month_start = now.replace(day=1, hour=0, minute=0, second=0, microsecond=0)
-    if month_start.month == 12:
-        next_month_start = month_start.replace(year=month_start.year + 1, month=1)
-    else:
-        next_month_start = month_start.replace(month=month_start.month + 1)
+    month_start, next_month_start = _current_month_bounds()
 
     line = (
         PurchaseOrderLine.objects.filter(

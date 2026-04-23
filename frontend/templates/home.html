@@ -2,13 +2,13 @@
 {% extends "base.html" %}
 {% load static %}
 
-{% block title %}Card Marketplace — Buy & Sell Trading Cards{% endblock %}
+{% block title %}TCGNET — Buy & Sell Trading Cards{% endblock %}
 
 {% block content %}
 
 <!-- HERO + SEARCH -->
 <section class="hero">
-    <span class="hero__eyebrow">The Trading Card Marketplace</span>
+    <span class="hero__eyebrow">TCGNET</span>
     <h1 class="hero__title">Buy & Sell<br><span>Rare Cards</span></h1>
     <p class="hero__subtitle">Discover thousands of cards, manage your collection, and trade with collectors worldwide.</p>
 
@@ -25,7 +25,10 @@
         <span class="hero__eyebrow">
             {% if showcase_is_sale %}Most expensive card sold this month{% else %}Waiting for this month's first sale{% endif %}
         </span>
-        <h2 class="section__title" id="kinetic-card-preview-title">{{ showcase_card.name }}</h2>
+        <div class="section-title-row">
+            <h2 class="section__title" id="kinetic-card-preview-title">{{ showcase_card.name }}</h2>
+            {% include "components/query_explainer.html" with explainer=query_explainers.monthly_showcase only %}
+        </div>
         <p class="kinetic-card-preview__meta">
             {{ showcase_card.set_name }} / {{ showcase_card.rarity }}
             {% if showcase_is_sale %}
@@ -44,7 +47,10 @@
 <!-- LATEST LISTINGS -->
 <section class="section">
     <div class="section__header">
-        <h2 class="section__title">Latest Listings</h2>
+        <div class="section-title-row">
+            <h2 class="section__title">Latest Listings</h2>
+            {% include "components/query_explainer.html" with explainer=query_explainers.latest_listings only %}
+        </div>
         <a href="{% url 'catalog' %}?available=1#browser" class="section__link">Browse all →</a>
     </div>
 
@@ -62,7 +68,10 @@
 <!-- FEATURED CARDS -->
 <section class="section">
     <div class="section__header">
-        <h2 class="section__title">Featured Cards</h2>
+        <div class="section-title-row">
+            <h2 class="section__title">Featured Cards</h2>
+            {% include "components/query_explainer.html" with explainer=query_explainers.featured_cards only %}
+        </div>
         <a href="{% url 'catalog' %}" class="section__link">View all →</a>
     </div>
 

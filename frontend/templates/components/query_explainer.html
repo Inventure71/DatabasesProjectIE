@@ -1,0 +1,42 @@
+{% if explainer %}
+<button
+    type="button"
+    class="query-help-button"
+    data-query-help-open="{{ explainer.id }}"
+    aria-label="Show database query steps for {{ explainer.title }}"
+>
+    ?
+</button>
+<dialog class="query-help-modal" id="{{ explainer.id }}" aria-labelledby="{{ explainer.id }}-title">
+    <div class="query-help-modal__surface">
+        <form method="dialog" class="query-help-modal__close-form">
+            <button type="submit" class="query-help-modal__close" aria-label="Close query explanation">&times;</button>
+        </form>
+        <p class="query-help-modal__eyebrow">Database query walkthrough</p>
+        <h2 class="query-help-modal__title" id="{{ explainer.id }}-title">{{ explainer.title }}</h2>
+        <p class="query-help-modal__summary">{{ explainer.summary }}</p>
+
+        <dl class="query-help-modal__meta">
+            <div>
+                <dt>Django path</dt>
+                <dd><code>{{ explainer.path }}</code></dd>
+            </div>
+            <div>
+                <dt>Tables touched</dt>
+                <dd>{{ explainer.tables }}</dd>
+            </div>
+        </dl>
+
+        <ol class="query-help-modal__steps">
+            {% for step in explainer.steps %}
+                <li>{{ step }}</li>
+            {% endfor %}
+        </ol>
+
+        <div class="query-help-modal__orm">
+            <span>ORM shape</span>
+            <pre><code>{{ explainer.orm }}</code></pre>
+        </div>
+    </div>
+</dialog>
+{% endif %}

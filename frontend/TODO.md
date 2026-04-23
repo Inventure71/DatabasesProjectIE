@@ -12,7 +12,7 @@ This file tracks frontend work now that `frontend/` is a sibling Django app.
 - [x] Catalog and marketplace pages now read real backend-backed data through frontend services
 - [x] Home search submits to catalog filtering instead of staying on the home page
 - [x] Catalog page results are paginated so large card sets are sliced by the database
-- [x] Home featured cards and latest listings are limited in the database before rendering
+- [x] Home featured cards show the current month's top sold variants and latest listings are limited in the database before rendering
 - [x] Listing detail buy form now uses the backend purchase workflow
 - [x] Authenticated users can view their collection, estimated value, owned quantities, available stock, and reserved stock
 - [x] Authenticated users can add a card they already own from the card detail page through an `Own this card?` secondary action.
@@ -38,6 +38,8 @@ This file tracks frontend work now that `frontend/` is a sibling Django app.
 - [x] Home central showcase displays the most expensive card sold in the current month, with a featured-card fallback when no monthly sale exists
 - [x] Home central showcase copy/card layout is centered as a paired group, with tighter desktop spacing and a centered mobile stack
 - [x] Home latest listings now appear above featured cards, and their browse link opens the shared catalog browser filtered to available cards.
+- [x] Database-backed frontend sections now include query walkthrough popups that explain the relevant Django ORM path, tables, filtering steps, ordering, and limits.
+- [x] Visible website brand and page-title references now use `TCGNET`.
 
 ## Working Rules
 
@@ -76,5 +78,7 @@ This file tracks frontend work now that `frontend/` is a sibling Django app.
 - [x] Verified current browser unification, listed-card overlay, sold-out ownership, and card-detail listing regressions with focused frontend tests.
 - [x] Verified partial-versus-full listed collection card treatment with focused frontend regression tests.
 - [x] Verified catalog/listings unification and home latest-listings ordering with focused frontend regression tests.
+- [x] Verified query walkthrough popups render on home, catalog, card detail, collection, and listing detail pages with focused frontend regression tests.
+- [x] Verified `TCGNET` website-name replacement with a frontend text scan and focused frontend tests.
 - [x] Restore the collection add-inventory POST flow using the aggregate inventory model; duplicate owner/card/condition additions merge into one quantity bucket.
 - [x] Add a dedicated `POST /collection/add/` route and card-detail `Own this card?` disclosure for adding owned cards without asking for purchase price.

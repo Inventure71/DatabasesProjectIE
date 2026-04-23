@@ -36,15 +36,17 @@ from frontend.services.catalog_service import (
     list_card_page,
     list_cards,
     list_similar_cards,
+    list_top_sold_cards_this_month,
 )
 from frontend.services.listing_service import (
     get_listing,
     list_listings,
 )
+from frontend.services.query_explainers import get_query_explainers
 
 
 def home(request):
-    featured_cards = list_cards({}, limit=6)
+    featured_cards = list_top_sold_cards_this_month(limit=6)
     monthly_top_sale = get_most_expensive_card_sold_this_month()
     showcase_card = monthly_top_sale or (featured_cards[0] if featured_cards else None)
     return render(
@@ -55,6 +57,13 @@ def home(request):
             "showcase_card": showcase_card,
             "showcase_is_sale": monthly_top_sale is not None,
             "latest_listings": list_listings({}, limit=6),
+            "query_explainers": get_query_explainers(
+                [
+                    "monthly_showcase",
+                    "latest_listings",
+                    "featured_cards",
+                ]
+            ),
         },
     )
 
@@ -90,6 +99,7 @@ def catalog(request):
             "languages": facets["languages"],
             "selected_rarities": request.GET.getlist("rarity"),
             "selected_available": request.GET.get("available") == "1",
+            "query_explainers": get_query_explainers(["catalog_results"]),
         },
     )
 
@@ -159,6 +169,14 @@ def _render_card_detail(request, card):
             "listed_id": request.GET.get("listed"),
             "added_id": request.GET.get("added"),
             "add_error": request.GET.get("add_error"),
+            "query_explainers": get_query_explainers(
+                [
+                    "your_copies",
+                    "active_listings",
+                    "price_history",
+                    "similar_cards",
+                ]
+            ),
         },
     )
 
@@ -280,6 +298,12 @@ def collection(request):
             "selected_rarities": request.GET.getlist("rarity"),
             "error": error,
             "listed_id": request.GET.get("listed"),
+            "query_explainers": get_query_explainers(
+                [
+                    "collection_summary",
+                    "collection_browser",
+                ]
+            ),
         },
     )
 
@@ -324,6 +348,7 @@ def listing_detail(request, listing_id):
         {
             "listing": listing,
             "error": error,
+            "query_explainers": get_query_explainers(["listing_detail"]),
         },
     )
 

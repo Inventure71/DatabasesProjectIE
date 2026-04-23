@@ -1,7 +1,7 @@
 {% extends "base.html" %}
 {% load static %}
 
-{% block title %}My Collection — Card Marketplace{% endblock %}
+{% block title %}My Collection — TCGNET{% endblock %}
 
 {% block content %}
 
@@ -29,6 +29,12 @@
 {% endif %}
 
 <section class="collection-stats" aria-label="Collection summary">
+    <div class="collection-stats__header">
+        <div class="section-title-row">
+            <span class="collection-stats__title">Collection Summary</span>
+            {% include "components/query_explainer.html" with explainer=query_explainers.collection_summary only %}
+        </div>
+    </div>
     <div class="collection-stat">
         <span class="collection-stat__label">Estimated Value</span>
         <span class="collection-stat__value">${{ collection_value.total_value }}</span>
@@ -127,7 +133,10 @@
 
     <section class="catalog-results collection-album" id="browser">
         <div class="section__header">
-            <h2 class="section__title">Owned Inventory Albums</h2>
+            <div class="section-title-row">
+                <h2 class="section__title">Owned Inventory Albums</h2>
+                {% include "components/query_explainer.html" with explainer=query_explainers.collection_browser only %}
+            </div>
             <div class="section__actions">
                 <a href="{% url 'collection' %}?view=card&my_listings=listed#browser" class="section__link">View listed cards →</a>
                 <a href="{% url 'catalog' %}" class="section__link">Find more cards →</a>
