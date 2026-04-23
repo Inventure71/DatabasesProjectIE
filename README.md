@@ -128,6 +128,11 @@ DJANGO_ALLOWED_HOSTS=.vercel.app,<your-production-domain-if-any>
 DATABASE_URL=postgresql://USER:PASSWORD@HOST:PORT/DBNAME?sslmode=require
 ```
 
+`DATABASE_URL` must point to a hosted PostgreSQL database. The local
+`POSTGRES_*` settings use `127.0.0.1`, which only works on your own machine;
+inside Vercel, `127.0.0.1` is the serverless function container, not your local
+PostgreSQL server.
+
 After linking the project with `vercel link`, run the production database setup from your machine:
 
 ```bash

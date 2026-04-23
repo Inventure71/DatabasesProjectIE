@@ -15,6 +15,7 @@ import sys
 import urllib.parse
 from pathlib import Path
 from dotenv import load_dotenv
+from django.core.exceptions import ImproperlyConfigured
 
 # Build paths inside the project like this: BASE_DIR / 'subdir'.
 BASE_DIR = Path(__file__).resolve().parent.parent
@@ -33,16 +34,20 @@ def _csv_env(name, default=""):
 
 SECRET_KEY = os.getenv("DJANGO_SECRET_KEY", "unsafe-dev-key")
 DEBUG = os.getenv("DJANGO_DEBUG", "False").lower() == "true"
+ON_VERCEL = bool(os.getenv("VERCEL_ENV"))
+if ON_VERCEL and DEBUG:
+    raise ImproperlyConfigured("DJANGO_DEBUG must be False on Vercel deployments.")
+
 ALLOWED_HOSTS = _csv_env("DJANGO_ALLOWED_HOSTS", "127.0.0.1,localhost")
 if os.getenv("VERCEL_URL"):
     ALLOWED_HOSTS.append(os.getenv("VERCEL_URL"))
-if os.getenv("VERCEL_ENV"):
+if ON_VERCEL:
     ALLOWED_HOSTS.append(".vercel.app")
 
 CSRF_TRUSTED_ORIGINS = _csv_env("DJANGO_CSRF_TRUSTED_ORIGINS")
 if os.getenv("VERCEL_URL"):
     CSRF_TRUSTED_ORIGINS.append(f"https://{os.getenv('VERCEL_URL')}")
-if os.getenv("VERCEL_ENV"):
+if ON_VERCEL:
     CSRF_TRUSTED_ORIGINS.append("https://*.vercel.app")
 
 
@@ -127,6 +132,11 @@ def _postgres_from_database_url(database_url):
 
 if os.getenv("DATABASE_URL"):
     default_database = _postgres_from_database_url(os.environ["DATABASE_URL"])
+elif ON_VERCEL:
+    raise ImproperlyConfigured(
+        "DATABASE_URL must be set on Vercel. Vercel cannot connect to local "
+        "PostgreSQL at 127.0.0.1; use a hosted PostgreSQL connection string."
+    )
 else:
     default_database = {
         "ENGINE": "django.db.backends.postgresql",
@@ -178,7 +188,14 @@ USE_TZ = True
 
 STATIC_URL = 'static/'
 STATIC_ROOT = PROJECT_ROOT / "staticfiles"
-STATICFILES_STORAGE = "whitenoise.storage.CompressedManifestStaticFilesStorage"
+STORAGES = {
+    "default": {
+        "BACKEND": "django.core.files.storage.FileSystemStorage",
+    },
+    "staticfiles": {
+        "BACKEND": "whitenoise.storage.CompressedManifestStaticFilesStorage",
+    },
+}
 
 SECURE_PROXY_SSL_HEADER = ("HTTP_X_FORWARDED_PROTO", "https")
 SESSION_COOKIE_SECURE = not DEBUG
