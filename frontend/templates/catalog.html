@@ -67,7 +67,7 @@
                 <select class="form-select" name="game" onchange="this.form.submit()">
                     <option value="">All Games</option>
                     {% for game in games %}
-                        <option value="{{ game }}" {% if request.GET.game == game %}selected{% endif %}>
+                        <option value="{{ game }}" {% if selected_game == game %}selected{% endif %}>
                             {{ game }}
                         </option>
                     {% endfor %}
@@ -77,13 +77,17 @@
             <!-- Set -->
             <div class="filter-group">
                 <label class="filter-label">Set</label>
-                <select class="form-select" name="set" onchange="this.form.submit()">
-                    <option value="">All Sets</option>
-                    {% for set in sets %}
-                        <option value="{{ set }}" {% if request.GET.set == set %}selected{% endif %}>
-                            {{ set }}
-                        </option>
-                    {% endfor %}
+                <select class="form-select" name="set" onchange="this.form.submit()" {% if not selected_game %}disabled{% endif %}>
+                    {% if selected_game %}
+                        <option value="">All Sets</option>
+                        {% for set in sets %}
+                            <option value="{{ set }}" {% if selected_set == set %}selected{% endif %}>
+                                {{ set }}
+                            </option>
+                        {% endfor %}
+                    {% else %}
+                        <option value="">Choose a game first</option>
+                    {% endif %}
                 </select>
             </div>
  

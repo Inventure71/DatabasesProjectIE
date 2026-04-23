@@ -40,6 +40,7 @@ This file tracks frontend work now that `frontend/` is a sibling Django app.
 - [x] Home latest listings now appear above featured cards, and their browse link opens the shared catalog browser filtered to available cards.
 - [x] Database-backed frontend sections now include query walkthrough popups that explain the relevant Django ORM path, tables, filtering steps, ordering, and limits.
 - [x] Visible website brand and page-title references now use `TCGNET`.
+- [x] Catalog and collection set filters now require a selected game, only show sets for that game, and ignore stale set filters from other games.
 
 ## Working Rules
 
@@ -80,5 +81,6 @@ This file tracks frontend work now that `frontend/` is a sibling Django app.
 - [x] Verified catalog/listings unification and home latest-listings ordering with focused frontend regression tests.
 - [x] Verified query walkthrough popups render on home, catalog, card detail, collection, and listing detail pages with focused frontend regression tests.
 - [x] Verified `TCGNET` website-name replacement with a frontend text scan and focused frontend tests.
+- [x] Verified dependent game/set filter behavior with focused frontend regression tests and the full frontend test suite.
 - [x] Restore the collection add-inventory POST flow using the aggregate inventory model; duplicate owner/card/condition additions merge into one quantity bucket.
 - [x] Add a dedicated `POST /collection/add/` route and card-detail `Own this card?` disclosure for adding owned cards without asking for purchase price.

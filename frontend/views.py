@@ -37,6 +37,7 @@ from frontend.services.catalog_service import (
     list_cards,
     list_similar_cards,
     list_top_sold_cards_this_month,
+    normalize_catalog_filter_params,
 )
 from frontend.services.listing_service import (
     get_listing,
@@ -69,18 +70,19 @@ def home(request):
 
 
 def catalog(request):
-    facets = get_card_facets()
-    card_page = list_card_page(request.GET)
-    browser_view = resolve_browser_view(request.GET, CARD_VIEW)
-    browser_records = card_page["results"] if browser_view == CARD_VIEW else list_cards(request.GET)
+    filter_params = normalize_catalog_filter_params(request.GET)
+    facets = get_card_facets(filter_params)
+    card_page = list_card_page(filter_params)
+    browser_view = resolve_browser_view(filter_params, CARD_VIEW)
+    browser_records = card_page["results"] if browser_view == CARD_VIEW else list_cards(filter_params)
     browser = build_record_browser(
         browser_records,
-        request.GET,
+        filter_params,
         mode="catalog",
         default_view=CARD_VIEW,
         external_pagination=card_page if browser_view == CARD_VIEW else None,
     )
-    pagination_query = request.GET.copy()
+    pagination_query = filter_params.copy()
     pagination_query.pop("page", None)
 
     return render(
@@ -97,8 +99,10 @@ def catalog(request):
             "sets": facets["sets"],
             "rarities": facets["rarities"],
             "languages": facets["languages"],
-            "selected_rarities": request.GET.getlist("rarity"),
-            "selected_available": request.GET.get("available") == "1",
+            "selected_game": filter_params.get("game", ""),
+            "selected_set": filter_params.get("set", ""),
+            "selected_rarities": filter_params.getlist("rarity"),
+            "selected_available": filter_params.get("available") == "1",
             "query_explainers": get_query_explainers(["catalog_results"]),
         },
     )
@@ -270,7 +274,8 @@ def collection(request):
 
     inventory_items = list_my_inventory(request.user)
     collection_value = get_collection_value(request.user)
-    facets = get_card_facets()
+    filter_params = normalize_catalog_filter_params(request.GET)
+    facets = get_card_facets(filter_params)
     summary = {
         "total_quantity": sum(item["quantity"] for item in inventory_items),
         "available_quantity": sum(item["available_quantity"] for item in inventory_items),
@@ -282,10 +287,10 @@ def collection(request):
         "collection.html",
         {
             "inventory_items": inventory_items,
-            "album": build_collection_album(inventory_items, request.GET),
+            "album": build_collection_album(inventory_items, filter_params),
             "browser": build_record_browser(
                 inventory_items,
-                request.GET,
+                filter_params,
                 mode="collection",
                 default_view=SET_VIEW,
             ),
@@ -295,7 +300,9 @@ def collection(request):
             "sets": facets["sets"],
             "rarities": facets["rarities"],
             "languages": facets["languages"],
-            "selected_rarities": request.GET.getlist("rarity"),
+            "selected_game": filter_params.get("game", ""),
+            "selected_set": filter_params.get("set", ""),
+            "selected_rarities": filter_params.getlist("rarity"),
             "error": error,
             "listed_id": request.GET.get("listed"),
             "query_explainers": get_query_explainers(

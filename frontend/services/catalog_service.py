@@ -32,6 +32,23 @@ def _available_only(params):
     return params.get("available", "") in {"1", "true", "on", "yes"}
 
 
+def _valid_selected_set_name(*, game_name, set_name):
+    if not game_name or not set_name:
+        return ""
+    if CardSet.objects.filter(game__name=game_name, name=set_name).exists():
+        return set_name
+    return ""
+
+
+def normalize_catalog_filter_params(params):
+    normalized = params.copy()
+    game = normalized.get("game", "")
+    set_name = normalized.get("set", "")
+    if set_name and _valid_selected_set_name(game_name=game, set_name=set_name) != set_name:
+        normalized.pop("set", None)
+    return normalized
+
+
 def _current_month_bounds():
     now = timezone.localtime()
     month_start = now.replace(day=1, hour=0, minute=0, second=0, microsecond=0)
@@ -140,7 +157,7 @@ def _filter_and_sort_display_variants(params):
     queryset = _display_variant_queryset()
     query = params.get("q", "").strip()
     game = params.get("game", "")
-    set_name = params.get("set", "")
+    set_name = _valid_selected_set_name(game_name=game, set_name=params.get("set", ""))
     language = params.get("language", "")
     selected_rarities = [rarity for rarity in _getlist(params, "rarity") if rarity]
     min_price = _minimum_price(params)
@@ -221,11 +238,17 @@ def card_variant_belongs_to_card(*, card_id, variant_id):
     return CardVariant.objects.filter(pk=variant_id, card_id=card_id).exists()
 
 
-def get_card_facets():
+def get_card_facets(params=None):
+    params = params or {}
+    selected_game = params.get("game", "")
     variants = CardVariant.objects.select_related("card__game", "set")
+    sets = CardSet.objects.none()
+    if selected_game:
+        sets = CardSet.objects.filter(game__name=selected_game).order_by("name")
+
     return {
         "games": list(CardGame.objects.order_by("name").values_list("name", flat=True)),
-        "sets": list(CardSet.objects.order_by("name").values_list("name", flat=True)),
+        "sets": list(sets.values_list("name", flat=True)),
         "rarities": list(variants.order_by("rarity").values_list("rarity", flat=True).distinct()),
         "languages": list(variants.order_by("language").values_list("language", flat=True).distinct()),
         "total_cards": Card.objects.count(),
