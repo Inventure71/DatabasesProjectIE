@@ -13,10 +13,9 @@ class InventoryItemAdmin(admin.ModelAdmin):
         "quantity",
         "reserved_quantity",
         "available_quantity",
-        "is_for_sale",
     )
     list_select_related = ("owner", "card_variant__card", "card_variant__set")
-    list_filter = ("condition", "is_for_sale", "card_variant__set")
+    list_filter = ("condition", "card_variant__set")
     search_fields = ("owner__username", "card_variant__card__name", "card_variant__collector_number")
     autocomplete_fields = ("owner", "card_variant")
     readonly_fields = ("created_at", "updated_at", "available_quantity")

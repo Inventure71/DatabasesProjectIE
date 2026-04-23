@@ -1,5 +1,6 @@
 from django.core.exceptions import ValidationError
 from django.db import transaction
+from django.db.models import Sum
 
 from inventory.models import InventoryHistory, InventoryItem
 from inventory.services import merge_purchased_item, release_reserved_quantity, reserve_quantity
@@ -81,6 +82,10 @@ def mark_listing_sold_out(*, listing, seller):
             raise ValidationError("Only active or paused listings can be marked sold out.")
         if listing.quantity_available != 0:
             raise ValidationError("Cannot mark a listing sold out while quantity is still available.")
+        inventory_item = _lock_inventory_item(listing.inventory_item)
+        expected_reserved_quantity = _expected_reserved_quantity(inventory_item=inventory_item)
+        if inventory_item.reserved_quantity != expected_reserved_quantity:
+            raise ValidationError("Cannot mark listing sold out while inventory reservations are inconsistent.")
 
         listing.status = MarketListing.Status.SOLD_OUT
         listing.full_clean()
@@ -190,3 +195,13 @@ def _validate_positive_quantity(quantity):
 def _validate_non_negative_price(price):
     if price < 0:
         raise ValidationError("Unit price cannot be negative.")
+
+
+def _expected_reserved_quantity(*, inventory_item):
+    return (
+        MarketListing.objects.filter(
+            inventory_item=inventory_item,
+            status__in=(MarketListing.Status.ACTIVE, MarketListing.Status.PAUSED),
+        ).aggregate(total=Sum("quantity_available"))["total"]
+        or 0
+    )

@@ -142,10 +142,8 @@
                             </div>
                         {% endif %}
                     </div>
-                    {% if item.has_active_listings %}
-                        <div class="owned-copy-row__status">Already listed</div>
-                    {% elif item.available_quantity > 0 %}
-                        <form class="owned-copy-row__form" method="post" action="{% url 'card_detail' card.id %}">
+                    {% if item.available_quantity > 0 %}
+                        <form class="owned-copy-row__form" method="post" action="{{ detail_url }}">
                             {% csrf_token %}
                             <input type="hidden" name="inventory_item_id" value="{{ item.id }}">
                             <label class="collection-sell-form__field">
@@ -158,6 +156,8 @@
                             </label>
                             <button type="submit" class="btn btn-gold btn-sm">List Copy</button>
                         </form>
+                    {% elif item.has_active_listings %}
+                        <div class="owned-copy-row__status">Already listed</div>
                     {% else %}
                         <div class="owned-copy-row__status">No available copies</div>
                     {% endif %}

@@ -29,6 +29,11 @@ def list_my_inventory(user):
     return [_inventory_item_to_frontend(item) for item in queryset]
 
 
+def list_my_inventory_for_variant(user, variant_id):
+    queryset = _user_inventory_queryset(user).filter(card_variant_id=variant_id)
+    return [_inventory_item_to_frontend(item) for item in queryset]
+
+
 def add_inventory_item_for_user(*, user, card_variant_id, condition, quantity, purchase_price=None):
     variant = _get_card_variant(card_variant_id)
     item = add_inventory_item(

@@ -344,6 +344,8 @@ class InventoryAdminTests(TestCase):
         self.assertEqual(item_admin.list_select_related, ("owner", "card_variant__card", "card_variant__set"))
         self.assertEqual(item_admin.autocomplete_fields, ("owner", "card_variant"))
         self.assertIn("available_quantity", item_admin.readonly_fields)
+        self.assertNotIn("is_for_sale", item_admin.list_display)
+        self.assertNotIn("is_for_sale", item_admin.list_filter)
 
     def test_inventory_history_admin_is_read_only_audit_log(self):
         history_admin = admin.site._registry[InventoryHistory]
@@ -409,6 +411,7 @@ class InventoryApiTests(APITestCase):
         self.assertEqual(response.data[0]["id"], own_item.id)
         self.assertEqual(response.data[0]["card_variant"]["card"]["name"], "Inventory API Dragon")
         self.assertEqual(response.data[0]["available_quantity"], 2)
+        self.assertNotIn("is_for_sale", response.data[0])
 
     def test_add_inventory_endpoint_uses_service_and_writes_history(self):
         self.client.force_authenticate(user=self.owner)

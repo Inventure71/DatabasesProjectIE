@@ -15,7 +15,7 @@
                 {% for slot in browser.page.items %}
                     <article class="album-card-slot{% if browser.mode == 'collection' %} album-card-slot--sleeve{% endif %}{% if browser.mode == 'collection' and slot.record.listing_state == 'fully_listed' %} album-card-slot--listed{% endif %}">
                         {% if browser.mode == "collection" %}
-                            <a href="{% url 'card_detail' slot.card.id %}" class="album-card-sleeve">
+                            <a href="{% url 'card_variant_detail' slot.card.variant_id %}" class="album-card-sleeve">
                                 <span class="album-card-sleeve__image">
                                     {% include "components/kinetic_card.html" with card=slot.card kinetic_card_class="kinetic-card--album-sleeve" %}
                                     <span class="album-card-sleeve__pills" aria-label="Collection quantities">
@@ -35,12 +35,12 @@
                                 </span>
                             </a>
                         {% else %}
-                            <a href="{% url 'card_detail' slot.card.id %}" class="album-card-slot__image album-card-slot__image-link" aria-label="View {{ slot.card.name }}">
+                            <a href="{% url 'card_variant_detail' slot.card.variant_id %}" class="album-card-slot__image album-card-slot__image-link" aria-label="View {{ slot.card.name }}">
                                 {% include "components/kinetic_card.html" with card=slot.card kinetic_card_class="kinetic-card--album" %}
                             </a>
 
                             <div class="album-card-slot__body">
-                                <a href="{% url 'card_detail' slot.card.id %}" class="album-card-slot__name">
+                                <a href="{% url 'card_variant_detail' slot.card.variant_id %}" class="album-card-slot__name">
                                     {{ slot.card.name }}
                                 </a>
                                 <div class="album-card-slot__meta">
@@ -66,7 +66,7 @@
                                             <dd>${{ slot.card.current_value }}</dd>
                                         </div>
                                     </dl>
-                                    <a href="{% url 'card_detail' slot.card.id %}" class="btn btn-outline-gold btn-sm album-card-slot__button">View Card</a>
+                                    <a href="{% url 'card_variant_detail' slot.card.variant_id %}" class="btn btn-outline-gold btn-sm album-card-slot__button">View Card</a>
                                 {% elif browser.mode == "listings" %}
                                     <dl class="album-card-slot__stats" aria-label="Listing data">
                                         <div>

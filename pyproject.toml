@@ -1,0 +1,7 @@
+[project]
+name = "databasesprojectie"
+version = "0.1.0"
+requires-python = ">=3.12"
+
+[project.scripts]
+app = "backend.config.wsgi:application"

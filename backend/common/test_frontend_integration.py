@@ -35,9 +35,7 @@ class FrontendIntegrationTests(TestCase):
         self.assertEqual(response.status_code, 200)
         self.assertContains(response, "Integration Dragon")
 
-    def test_mock_catalog_cards_endpoint_returns_frontend_service_data(self):
+    def test_mock_api_is_not_mounted(self):
         response = self.client.get("/mock-api/catalog/cards/")
 
-        self.assertEqual(response.status_code, 200)
-        self.assertIn("results", response.json())
-        self.assertGreater(len(response.json()["results"]), 0)
+        self.assertEqual(response.status_code, 404)

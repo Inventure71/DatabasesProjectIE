@@ -4,7 +4,7 @@ This project is one Django application with two sibling source areas:
 
 ```text
 backend/   real database models, business logic, and API endpoints
-frontend/  templates, static files, page views, and mock frontend data contracts
+frontend/  templates, static files, page views, and service-backed page contracts
 ```
 
 Run Django from the repository root:
@@ -26,10 +26,10 @@ http://127.0.0.1:8000/
 - Do not merge another branch blindly if it changes both `backend/` and `frontend/`.
 - Backend work and frontend work should be integrated through small pull requests or merge commits.
 - Real backend endpoints always live under `/api/...`.
-- Fake or simulated frontend endpoints always live under `/mock-api/...`.
+- `/mock-api/...` is not mounted now; add it only for a future JavaScript feature that needs temporary simulated JSON.
 - Do not create fake endpoints under `/api/...`; that hides whether the real backend exists.
 - Do not put large fake data lists directly in `frontend/views.py`.
-- Keep fake data and frontend data-shaping code inside `frontend/services/`.
+- Keep frontend data-shaping code inside `frontend/services/`.
 - When a backend feature becomes real, replace the internals of the relevant frontend service instead of rewriting templates first.
 
 ## Backend Developer Instructions
@@ -80,8 +80,7 @@ python manage.py test common catalog users inventory marketplace pricing
 
 If a backend feature is not ready yet, do not create a fake `/api/...` endpoint.
 Tell the frontend developer what data shape the future endpoint or service should
-return, and let the frontend developer simulate it under `frontend/services/` or
-`/mock-api/...`.
+return, and let the frontend developer simulate it inside `frontend/services/`.
 
 ## Frontend Developer Instructions
 
@@ -93,7 +92,6 @@ frontend/static/
 frontend/views.py
 frontend/urls.py
 frontend/services/
-frontend/mock_api/
 frontend/tests.py
 ```
 
@@ -104,7 +102,6 @@ The frontend developer should focus on:
 - CSS and static assets
 - page-level Django views
 - frontend service functions
-- mock JSON endpoints for unfinished backend features
 - frontend tests
 
 Frontend pages live at normal page routes.
@@ -119,15 +116,6 @@ Examples:
 /listings/1/
 /login/
 /register/
-```
-
-Frontend JavaScript may use mock endpoints only under `/mock-api/...`.
-
-Examples:
-
-```text
-/mock-api/catalog/cards/
-/mock-api/marketplace/listings/
 ```
 
 When adding a new page, first create or update a service function in
@@ -175,62 +163,14 @@ def list_inventory_items(user, filters):
             "condition": "Near Mint",
             "quantity": 2,
             "available_quantity": 2,
-            "is_for_sale": False,
         }
     ]
 ```
 
-Use `frontend/mock_api/` when browser JavaScript needs JSON.
-
-Example:
-
-```python
-# frontend/mock_api/views.py
-
-from django.http import JsonResponse
-
-
-def mock_inventory_items(request):
-    return JsonResponse({
-        "results": [
-            {
-                "id": 1,
-                "card_name": "Charizard",
-                "quantity": 2,
-            }
-        ]
-    })
-```
-
-Then register the mock route under `frontend/mock_api/urls.py`:
-
-```python
-from django.urls import path
-
-from frontend.mock_api import views
-
-urlpatterns = [
-    path("inventory/items/", views.mock_inventory_items, name="mock-inventory-items"),
-]
-```
-
-The browser would call:
-
-```text
-/mock-api/inventory/items/
-```
-
-Later, when the real backend endpoint exists, switch the frontend from:
-
-```text
-/mock-api/inventory/items/
-```
-
-to:
-
-```text
-/api/inventory/items/
-```
+If future browser JavaScript needs JSON before a real backend endpoint exists,
+add a small temporary mock route deliberately and document when it should be
+removed. Do not keep mock routes mounted after the matching backend-backed
+service exists.
 
 ## Replacing A Mock With Real Backend Data
 
@@ -281,7 +221,7 @@ git diff --name-status merge-attempt...HEAD
 If a frontend branch changes backend models, migrations, or API services, stop
 and discuss it first.
 
-If a backend branch changes templates, CSS, or frontend mock services, stop and
+If a backend branch changes templates, CSS, or frontend services, stop and
 discuss it first.
 
 ## Conflict Rule
@@ -294,19 +234,13 @@ Common shared files:
 backend/config/settings.py
 backend/config/urls.py
 frontend/services/
-frontend/mock_api/
 ```
 
 For shared files, prefer small changes and explain why the change belongs there.
 
 ## Current Contract
 
-Currently available frontend simulation endpoints:
-
-```text
-/mock-api/catalog/cards/
-/mock-api/marketplace/listings/
-```
+Currently available frontend simulation endpoints: none.
 
 Currently available real backend API areas:
 
@@ -320,4 +254,4 @@ Currently available real backend API areas:
 
 Some real API areas may be route skeletons until their backend phase is
 implemented. If the real endpoint does not return the needed data yet, the
-frontend should continue using `/mock-api/...` or `frontend/services/...`.
+frontend should continue using `frontend/services/...` as the page boundary.

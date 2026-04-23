@@ -2,6 +2,7 @@ from decimal import Decimal, ROUND_HALF_UP
 
 from django.core.exceptions import ValidationError
 from django.db import transaction
+from django.db.models import DecimalField, ExpressionWrapper, F, Sum
 
 from catalog.models import CardVariant
 from inventory.models import InventoryItem
@@ -63,13 +64,15 @@ def get_variant_price_history(*, card_variant, limit=None):
 
 
 def estimate_collection_value(*, owner):
-    total = Decimal("0.00")
-    inventory_items = InventoryItem.objects.filter(owner=owner).select_related("card_variant")
-
-    for item in inventory_items:
-        total += item.card_variant.current_value * item.quantity
-
-    return total
+    line_value = ExpressionWrapper(
+        F("quantity") * F("card_variant__current_value"),
+        output_field=DecimalField(max_digits=20, decimal_places=2),
+    )
+    total = (
+        InventoryItem.objects.filter(owner=owner, quantity__gt=0)
+        .aggregate(total=Sum(line_value))["total"]
+    )
+    return total or Decimal("0.00")
 
 
 def _calculate_current_value_from_price_history(*, card_variant):

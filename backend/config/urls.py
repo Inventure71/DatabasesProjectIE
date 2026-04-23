@@ -9,5 +9,4 @@ urlpatterns = [
     path("api/inventory/", include("inventory.urls")),
     path("api/marketplace/", include("marketplace.urls")),
     path("api/pricing/", include("pricing.urls")),
-    path("mock-api/", include("frontend.mock_api.urls")),
 ]

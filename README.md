@@ -1,6 +1,8 @@
 # DatabasesProjectIE
 
-From the repo root:
+## Local Setup
+
+Run these commands from the repository root:
 
 ```bash
 cd /Users/inventure71/VSProjects/School/DatabasesProjectIE
@@ -10,7 +12,48 @@ source .venv/bin/activate
 pip install -r requirements.txt
 ```
 
-Create `.env` in the repo root:
+Start PostgreSQL locally. On macOS with Homebrew:
+
+```bash
+brew services start postgresql@14
+pg_isready -h 127.0.0.1 -p 5432
+```
+
+`pg_isready` should report that PostgreSQL is accepting connections.
+
+Create a PostgreSQL role and database for this project:
+
+```bash
+psql postgres
+```
+
+Inside the `psql` prompt, run:
+
+```sql
+CREATE ROLE cards_user WITH LOGIN PASSWORD 'choose-a-local-password';
+CREATE DATABASE cards_marketplace OWNER cards_user;
+\q
+```
+
+Important distinction:
+
+- `cards_marketplace` is the database name.
+- `cards_user` is the database role/user.
+- The password belongs to `cards_user`, not to `cards_marketplace`.
+
+If your `psql` prompt ends with `-#` instead of `=#`, PostgreSQL thinks you are
+inside an unfinished SQL command. Press `Ctrl+C` to cancel the unfinished command
+and return to a clean prompt.
+
+If the role or database already exists, update them instead:
+
+```sql
+ALTER ROLE cards_user WITH PASSWORD 'choose-a-local-password';
+ALTER DATABASE cards_marketplace OWNER TO cards_user;
+```
+
+Create `.env` in the repo root. Use the same password you assigned to
+`cards_user`:
 
 ```bash
 cat > .env <<'EOF'
@@ -18,18 +61,18 @@ DJANGO_SECRET_KEY=dev-only-change-this-later
 DJANGO_DEBUG=True
 DJANGO_ALLOWED_HOSTS=127.0.0.1,localhost
 
-MYSQL_DATABASE=cards_marketplace
-MYSQL_USER=root
-MYSQL_PASSWORD=your_mysql_password
-MYSQL_HOST=127.0.0.1
-MYSQL_PORT=3306
+POSTGRES_DATABASE=cards_marketplace
+POSTGRES_USER=cards_user
+POSTGRES_PASSWORD=choose-a-local-password
+POSTGRES_HOST=127.0.0.1
+POSTGRES_PORT=5432
 EOF
 ```
 
-Create a fresh MySQL database:
+Test the database credentials directly before running Django:
 
 ```bash
-mysql -u root -p -e "DROP DATABASE IF EXISTS cards_marketplace; CREATE DATABASE cards_marketplace CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;"
+PGPASSWORD='choose-a-local-password' psql -h 127.0.0.1 -U cards_user -d cards_marketplace -c "select current_database(), current_user;"
 ```
 
 Apply schema, then import the CSV dataset:
@@ -53,3 +96,47 @@ python manage.py shell -c "from catalog.models import CardGame, CardSet, Card, C
 ```
 
 Expected current import scope: `Base` + `Jungle`, which should load `132` card variants. The import command is repeatable because it uses `update_or_create`, so rerunning it updates existing rows instead of duplicating them.
+
+Run the local web app:
+
+```bash
+python manage.py runserver
+```
+
+Open `http://127.0.0.1:8000/`.
+
+Run the test suite:
+
+```bash
+python manage.py test common catalog users inventory marketplace pricing frontend --keepdb
+```
+
+## Deploy On Vercel
+
+This project is configured for Vercel's Django support with:
+
+- `pyproject.toml`: points Vercel at `backend.config.wsgi:application`.
+- `vercel.json`: runs `collectstatic` during the build.
+- `DATABASE_URL`: preferred production PostgreSQL connection setting.
+
+Set these Vercel environment variables before deploying:
+
+```text
+DJANGO_SECRET_KEY=<production-secret>
+DJANGO_DEBUG=False
+DJANGO_ALLOWED_HOSTS=.vercel.app,<your-production-domain-if-any>
+DATABASE_URL=postgresql://USER:PASSWORD@HOST:PORT/DBNAME?sslmode=require
+```
+
+After linking the project with `vercel link`, run the production database setup from your machine:
+
+```bash
+vercel env run -- python manage.py migrate
+vercel env run -- python manage.py import_pokemon_cards_dataset --all-source-sets
+```
+
+Then deploy:
+
+```bash
+vercel --prod
+```

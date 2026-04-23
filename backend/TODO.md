@@ -5,9 +5,9 @@ This file is the step-by-step plan for building the backend together.
 Scope:
 - Backend domain apps own data, business rules, persistence, and real APIs
 - Frontend lives as a sibling Django app at `frontend/`
-- Frontend simulation APIs live under `/mock-api/`
+- Frontend pages use `frontend/services/`; mock JSON APIs were removed after real backend-backed services became canonical
 - Real backend APIs live under `/api/`
-- Primary stack: Django + Django REST Framework + MySQL
+- Primary stack: Django + Django REST Framework + PostgreSQL
 
 Working principles:
 - Finish one phase before starting the next
@@ -29,7 +29,7 @@ Steps:
 - [x] Confirm the backend stack:
   - Django
   - Django REST Framework
-  - MySQL
+  - PostgreSQL
   - Django built-in auth
 - [x] Confirm the backend apps:
   - `users`
@@ -54,7 +54,7 @@ Exit criteria:
 - We agree on module boundaries and MVP scope
 
 Current status:
-- [x] Confirmed backend stack and implemented project foundation with Django, Django REST Framework, MySQL, and Django built-in auth
+- [x] Confirmed backend stack and implemented project foundation with Django, Django REST Framework, PostgreSQL, and Django built-in auth
 - [x] Confirmed backend app boundaries: `common`, `users`, `catalog`, `inventory`, `marketplace`, and `pricing`
 - [x] Confirmed similarity is optional later work and not part of the first transactional marketplace slice
 - [x] Inventory uses an aggregate stock rule: one row per owner, card variant, and condition; duplicate additions increase quantity on that row.
@@ -68,7 +68,7 @@ Goal:
 What you should learn:
 - Django project structure
 - Environment-based configuration
-- How Django connects to MySQL
+- How Django connects to PostgreSQL
 
 Steps:
 - [x] Create the backend Django project structure
@@ -76,7 +76,7 @@ Steps:
 - [x] Add core dependencies:
   - `django`
   - `djangorestframework`
-  - `mysqlclient` or another MySQL adapter we choose explicitly
+  - `psycopg` or another PostgreSQL adapter we choose explicitly
   - optional dev tools later
 - [x] Create `.env` file and strategy for:
   - database host
@@ -88,31 +88,36 @@ Steps:
   - debug flag
 - [x] Configure `settings.py` for:
   - installed apps
-  - MySQL database
+  - PostgreSQL database
   - timezone
   - static defaults
   - REST framework defaults
 - [x] Create local run instructions
 - [x] Verify the Django server starts successfully
-- [x] Verify Django connects to MySQL successfully
+- [ ] Verify Django connects to the chosen PostgreSQL database successfully
 
 Verification:
 - [x] `python manage.py check` passes
-- [x] `python manage.py migrate` runs successfully
-- [x] Local server boots without configuration errors
+- [ ] `python manage.py migrate` runs successfully against PostgreSQL
+- [ ] Local server boots without PostgreSQL configuration errors
 
 Current status:
 - [x] Verified on 2026-04-20 that `python manage.py check` passes with no issues
+- [x] Verified on 2026-04-23 that `python manage.py check` passes after switching settings to PostgreSQL.
+- [x] Verified on 2026-04-23 that `python manage.py makemigrations --check --dry-run` reports no model changes after the PostgreSQL/Vercel config change; the command warned that no local PostgreSQL server was listening on `127.0.0.1:5432`.
+- [ ] Verify `python manage.py migrate` against the final local or remote PostgreSQL database.
+- [ ] Verify the full test suite against PostgreSQL after the database is available.
 - [x] Moved Django command entrypoint to repository-root `manage.py` so `backend/` and `frontend/` can be sibling folders
 - [x] Verified on 2026-04-20 that root `python manage.py check` passes with no issues
 - [x] Verified on 2026-04-20 that `python manage.py test common catalog users inventory marketplace pricing` runs 46 tests successfully
 - [x] Verified on 2026-04-20 that the broader suite `python manage.py test common catalog users inventory marketplace pricing frontend --keepdb` runs 148 tests successfully after choosing the aggregate inventory model.
 - [x] Verified that Django apps exist under `backend/`
-- [x] Verified that `requirements.txt` includes Django, Django REST Framework, MySQL client, and python-dotenv
-- [x] Verified on 2026-04-20 that `.env` exists with the expected keys
+- [x] Verified that `requirements.txt` includes Django, Django REST Framework, PostgreSQL client, WhiteNoise, and python-dotenv
+- [ ] Update local `.env` to use PostgreSQL keys or `DATABASE_URL`.
 - [x] Verified on 2026-04-20 that no migrations are pending with `python manage.py migrate --check`
 - [x] Verified from user run output that the Django development server starts on `http://127.0.0.1:8000/`
 - [x] Verified on 2026-04-20 that `backend/README.md` documents setup, database creation, checks, migrations, and local server startup
+- [x] Updated setup docs on 2026-04-23 to explain the PostgreSQL role/user password, `cards_marketplace` database ownership, direct `psql` credential check, and local run/test commands.
 
 ## Phase 2: Shared Backend Conventions
 
@@ -783,6 +788,7 @@ Current status:
 - [x] Implemented `GET /api/pricing/variants/<variant_id>/history/`
 - [x] Variant price history endpoint is public read-only data
 - [x] Variant price history returns snapshots newest first
+- [x] Variant price history is paginated with the same default page size as catalog cards
 - [x] Variant price history returns `404 Not Found` for missing variants
 - [x] Included collection valuation in the MVP because Phase 14 already has the service and users need a portfolio total
 - [x] Implemented `GET /api/pricing/my/collection-value/`
@@ -929,14 +935,14 @@ Current status:
 - [x] Registered `frontend` in `INSTALLED_APPS`
 - [x] Mounted frontend pages at `/`
 - [x] Kept real backend endpoints under `/api/`
-- [x] Added frontend simulation endpoints under `/mock-api/`
-- [x] Moved frontend fake catalog/listing data behind `frontend/services/`
-- [x] Added integration tests for root `manage.py`, `/`, and `/mock-api/catalog/cards/`
+- [x] Removed stale `/mock-api/` routes after catalog/listing pages moved to real backend-backed services
+- [x] Removed stale frontend fake catalog/listing data
+- [x] Added integration tests for root `manage.py`, `/`, and verifying `/mock-api/` is no longer mounted
 
 Next steps:
-- [ ] Replace one frontend service at a time with real backend queries once the matching backend module is complete
-- [ ] Keep unfinished simulated JSON endpoints under `/mock-api/`, never under `/api/`
-- [ ] Add frontend tests for each new page or mock API contract the frontend depends on
+- [x] Replace frontend catalog/listing service internals with real backend queries once the matching backend module is complete
+- [x] Keep stale simulated JSON endpoints out of the running URL config
+- [ ] Add frontend tests for each new page or real service contract the frontend depends on
 
 ## Recommended Build Order
 
@@ -966,7 +972,7 @@ Strict order:
 Immediate next steps:
 - [x] Decide exact backend dependency stack
 - [x] Scaffold the backend project
-- [x] Configure MySQL and environment variables
+- [x] Configure PostgreSQL and environment variables
 - [x] Create the Django apps
 - [x] Add shared settings
 - [x] Add shared backend conventions
@@ -998,7 +1004,7 @@ We are explicitly not prioritizing these right now:
 
 Recorded on 2026-04-20 after reviewing backend code for outdated code, leftovers, backward-compatibility migration paths, and unnecessary repetition.
 
-- [ ] Decide whether to remove or properly maintain `InventoryItem.is_for_sale`; marketplace listing state now lives on `MarketListing`, and services do not update the inventory flag.
+- [x] Removed `InventoryItem.is_for_sale`; marketplace listing state now lives on `MarketListing.status` plus `quantity_available`.
 - [ ] Remove generated `__pycache__/` directories from the backend working tree if they are not needed locally.
 - [ ] Clean Django startapp boilerplate in empty scaffold files, especially `common.views` and the current placeholder `pricing` files.
 - [ ] Decide whether `backend/PLAN.md` is still authoritative; it now conflicts with the implemented marketplace field names, routes, and MVP scope.

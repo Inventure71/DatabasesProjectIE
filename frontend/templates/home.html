@@ -34,7 +34,7 @@
         </p>
     </div>
     <div class="kinetic-card-preview__stage">
-        <a class="kinetic-card-preview__link" href="{% url 'card_detail' showcase_card.id %}" aria-label="View {{ showcase_card.name }}">
+        <a class="kinetic-card-preview__link" href="{% url 'card_variant_detail' showcase_card.variant_id %}" aria-label="View {{ showcase_card.name }}">
             {% include "components/kinetic_card.html" with card=showcase_card kinetic_card_class="kinetic-card--showcase" %}
         </a>
     </div>
