@@ -286,6 +286,8 @@ Current status:
 - [x] Verified the current `pokemon-cards.csv` can be parsed for all-set mode: 13,139 rows, 147 source sets, and 0 unparseable id suffixes.
 - [x] Optimized `import_pokemon_cards_dataset --all-source-sets` on 2026-04-23 to use batched set/card/variant/image upserts instead of per-row ORM `update_or_create` calls, making remote PostgreSQL imports practical.
 - [x] Added a regression test proving the all-set importer uses bounded batched database writes for repeated card names.
+- [x] Fixed duplicate import rows resolving to the same `CardVariant` so image bulk upsert creates or updates only one `CardImage` per variant, preserving one-to-one idempotency.
+- [x] Verified on 2026-04-24 that `python manage.py test catalog --keepdb` passes after the duplicate-row image upsert fix.
 
 ## Phase 5: Catalog Read API
 

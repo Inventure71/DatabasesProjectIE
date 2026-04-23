@@ -45,7 +45,7 @@ QUERY_EXPLAINERS = {
     "featured_cards": {
         "id": "query-help-featured-cards",
         "title": "Featured cards query",
-        "summary": "Ranks this month's sold card variants by sold quantity and total sale value.",
+        "summary": "Ranks this month's sold card variants, then fills any empty display slots from catalog variants.",
         "path": "frontend.services.catalog_service.list_top_sold_cards_this_month",
         "tables": "PurchaseOrderLine, PurchaseOrder, CardVariant, Card, CardGame, CardSet, CardImage",
         "steps": [
@@ -53,33 +53,39 @@ QUERY_EXPLAINERS = {
             "Group those rows by card_variant_id.",
             "Annotate each group with total quantity sold and total sales value.",
             "Sort by most units sold, then highest sales total, then card_variant_id for stable output.",
-            "Fetch the matching CardVariant rows and convert only those variants into frontend cards.",
+            "If fewer than six distinct sold variants exist, query CardVariant for the missing number of fallback catalog cards.",
+            "Exclude variants already selected from sales so the Featured Cards grid does not duplicate a card.",
+            "Fetch the selected CardVariant rows and convert them into frontend cards in priority order.",
         ],
         "orm": (
             "PurchaseOrderLine.objects.filter(...).values('card_variant_id')\n"
             "    .annotate(sold_quantity=Sum('quantity'), sales_total=Sum(quantity * unit_price))\n"
-            "    .order_by('-sold_quantity', '-sales_total', 'card_variant_id')[:6]"
+            "    .order_by('-sold_quantity', '-sales_total', 'card_variant_id')[:6]\n"
+            "CardVariant.objects.exclude(pk__in=sold_ids)\n"
+            "    .order_by('-current_value', 'card__name', 'id')[:missing_slots]"
         ),
     },
     "catalog_results": {
         "id": "query-help-catalog-results",
         "title": "Catalog browser query",
-        "summary": "Searches and filters card variants, then paginates the result in the database.",
-        "path": "frontend.services.catalog_service.list_card_page",
+        "summary": "Searches and filters card variants, paginates cards, and groups book/shelf summaries in the database.",
+        "path": "frontend.services.catalog_service.list_card_page + list_catalog_set_summaries",
         "tables": "CardVariant, Card, CardGame, CardSet, CardImage, MarketListing",
         "steps": [
             "Start from CardVariant because inventory, listings, and pricing all depend on exact printings.",
             "Join Card, CardGame, CardSet, and CardImage with select_related.",
-            "Apply the sidebar filters: name search, game, set, rarity, language, and value range.",
+            "Apply the sidebar filters in SQL: MySQL-safe LIKE search over identity fields, game, set, rarity, language, and value range.",
             "When Only available is checked, add an EXISTS subquery that looks for an active listing with available quantity for the same variant.",
-            "Apply sort order, then Paginator adds LIMIT and OFFSET so only the visible page is read.",
+            "For card view, apply sort order, then Paginator adds LIMIT and OFFSET so only the visible page is read.",
+            "For book and shelf views, use GROUP BY with Count and Sum annotations so the database computes set/game totals.",
         ],
         "orm": (
             "CardVariant.objects.select_related('card__game', 'set', 'image')\n"
-            "    .filter(...)\n"
+            "    .filter(Q(card__name__icontains=q) | Q(collector_number__icontains=q) | ...)\n"
             "    .annotate(has_active_listing=Exists(MarketListing.objects.filter(...)))\n"
             "    .order_by(...)\n"
-            "    # Paginator applies LIMIT/OFFSET"
+            "    # Paginator applies LIMIT/OFFSET for card view\n"
+            "queryset.values('set_id', 'set__name').annotate(Count('id'), Sum('current_value'))"
         ),
     },
     "active_listings": {
@@ -125,18 +131,19 @@ QUERY_EXPLAINERS = {
     "price_history": {
         "id": "query-help-price-history",
         "title": "Price history query",
-        "summary": "Reads stored price snapshots for the exact card variant.",
+        "summary": "Reads the newest stored price snapshots for the exact card variant.",
         "path": "frontend.services.catalog_service.build_price_history",
         "tables": "PriceSnapshot, CardVariant",
         "steps": [
             "Read the current card variant id from the detail card data.",
             "Filter PriceSnapshot rows to that card_variant_id.",
             "Sort newest captured_at first, then newest id for stable ordering.",
-            "Return date, price, and source name for each stored snapshot.",
+            "Apply LIMIT 24 so long histories do not load every stored snapshot.",
+            "Return date, price, and source name for the displayed snapshots.",
         ],
         "orm": (
             "PriceSnapshot.objects.filter(card_variant_id=variant_id)\n"
-            "    .order_by('-captured_at', '-id')"
+            "    .order_by('-captured_at', '-id')[:24]"
         ),
     },
     "similar_cards": {
@@ -162,39 +169,43 @@ QUERY_EXPLAINERS = {
     "collection_summary": {
         "id": "query-help-collection-summary",
         "title": "Collection summary query",
-        "summary": "Loads the signed-in user's inventory and computes the visible collection totals.",
-        "path": "frontend.views.collection + frontend.services.backend_api.list_my_inventory",
-        "tables": "InventoryItem, MarketListing, CardVariant, Card, CardGame, CardSet, CardImage",
+        "summary": "Computes the signed-in user's owned, available, and reserved inventory totals with SQL aggregates.",
+        "path": "frontend.services.backend_api.get_inventory_summary",
+        "tables": "InventoryItem",
         "steps": [
             "Filter InventoryItem rows to owner=request.user and quantity greater than zero.",
-            "Join card metadata with select_related.",
-            "Prefetch active listings so reserved/listed quantities can be shown beside owned quantities.",
-            "Sum quantity, available_quantity, and reserved_quantity in the frontend view context.",
-            "Ask pricing services for estimated collection value using the same owner-scoped inventory.",
+            "Ask the database to SUM owned quantity.",
+            "Ask the database to SUM reserved_quantity.",
+            "Compute available quantity as SUM(quantity - reserved_quantity).",
+            "Ask pricing services for estimated collection value through its own owner-scoped aggregate query.",
         ],
         "orm": (
-            "InventoryItem.objects.filter(owner=user, quantity__gt=0)\n"
-            "    .select_related(...)\n"
-            "    .prefetch_related(active_listing_prefetch)\n"
-            "    .order_by('card_variant__card__name', 'condition')"
+            "InventoryItem.objects.filter(owner=user, quantity__gt=0).aggregate(\n"
+            "    total_quantity=Sum('quantity'),\n"
+            "    available_quantity=Sum(F('quantity') - F('reserved_quantity')),\n"
+            "    reserved_quantity=Sum('reserved_quantity'),\n"
+            ")"
         ),
     },
     "collection_browser": {
         "id": "query-help-collection-browser",
         "title": "Owned inventory browser query",
         "summary": "Shows the signed-in user's owned inventory as cards, set books, or shelves.",
-        "path": "frontend.services.album_service.build_record_browser",
+        "path": "frontend.services.backend_api.list_my_inventory_page + list_collection_set_summaries",
         "tables": "InventoryItem, MarketListing, CardVariant, Card, CardGame, CardSet, CardImage",
         "steps": [
-            "Reuse the owner-scoped inventory rows already loaded for the collection page.",
-            "Apply browser filters for search, game, set, rarity, language, value range, and listed-only state.",
-            "Project each inventory row into a card slot, set book, or game shelf depending on the selected view.",
-            "For card view, paginate the filtered records before rendering the album page.",
-            "Display owned and listed quantities from the prefetched active listings.",
+            "Start from InventoryItem rows owned by request.user with quantity greater than zero.",
+            "Apply browser filters in SQL: search, game, set, rarity, language, value range, and listed-only state.",
+            "For listed-only filtering, use an EXISTS subquery against active MarketListing rows for the inventory item.",
+            "For card view, Paginator applies LIMIT 12/OFFSET before inventory rows are converted for templates.",
+            "For set books and game shelves, GROUP BY set or game and annotate Count, Sum(quantity), and Sum(quantity * current_value).",
+            "Prefetch active listings only for the visible card rows so listed quantity pills avoid N+1 queries.",
         ],
         "orm": (
-            "InventoryItem owner query -> frontend record projection ->\n"
-            "build_record_browser(records, request.GET, mode='collection')"
+            "InventoryItem.objects.filter(owner=user, quantity__gt=0).filter(...)\n"
+            "    .annotate(has_active_listing=Exists(MarketListing.objects.filter(...)))\n"
+            "    # Paginator applies LIMIT 12/OFFSET for card view\n"
+            "queryset.values('card_variant__set_id').annotate(Count('id'), Sum('quantity'))"
         ),
     },
     "listing_detail": {

@@ -13,6 +13,7 @@ from inventory.models import InventoryItem
 from frontend.services.album_service import (
     CARD_VIEW,
     SET_VIEW,
+    SHELF_VIEW,
     build_collection_album,
     build_record_browser,
     resolve_browser_view,
@@ -21,9 +22,13 @@ from frontend.services.backend_api import (
     add_inventory_item_for_user,
     buy_marketplace_listing,
     create_marketplace_listing_for_user,
+    get_inventory_summary,
     get_collection_value,
-    list_my_inventory_for_variant,
+    list_collection_game_summaries,
+    list_collection_set_summaries,
     list_my_inventory,
+    list_my_inventory_for_variant,
+    list_my_inventory_page,
 )
 from frontend.services.catalog_service import (
     build_price_history,
@@ -34,7 +39,8 @@ from frontend.services.catalog_service import (
     get_most_expensive_card_sold_this_month,
     list_active_listings_for_variant,
     list_card_page,
-    list_cards,
+    list_catalog_game_summaries,
+    list_catalog_set_summaries,
     list_similar_cards,
     list_top_sold_cards_this_month,
     normalize_catalog_filter_params,
@@ -74,13 +80,23 @@ def catalog(request):
     facets = get_card_facets(filter_params)
     card_page = list_card_page(filter_params)
     browser_view = resolve_browser_view(filter_params, CARD_VIEW)
-    browser_records = card_page["results"] if browser_view == CARD_VIEW else list_cards(filter_params)
+    catalog_books = list_catalog_set_summaries(filter_params) if browser_view == SET_VIEW else []
+    catalog_shelves = list_catalog_game_summaries(filter_params) if browser_view == SHELF_VIEW else []
+    browser_records = card_page["results"] if browser_view == CARD_VIEW else []
+    browser_count = card_page["count"]
+    if browser_view == SET_VIEW:
+        browser_count = sum(book["record_count"] for book in catalog_books)
+    elif browser_view == SHELF_VIEW:
+        browser_count = sum(shelf["record_count"] for shelf in catalog_shelves)
     browser = build_record_browser(
         browser_records,
         filter_params,
         mode="catalog",
         default_view=CARD_VIEW,
         external_pagination=card_page if browser_view == CARD_VIEW else None,
+        books=catalog_books,
+        shelves=catalog_shelves,
+        total_count=browser_count,
     )
     pagination_query = filter_params.copy()
     pagination_query.pop("page", None)
@@ -272,15 +288,20 @@ def collection(request):
                 else:
                     return redirect(f"{reverse('collection')}?listed={listing['id']}")
 
-    inventory_items = list_my_inventory(request.user)
     collection_value = get_collection_value(request.user)
     filter_params = normalize_catalog_filter_params(request.GET)
     facets = get_card_facets(filter_params)
-    summary = {
-        "total_quantity": sum(item["quantity"] for item in inventory_items),
-        "available_quantity": sum(item["available_quantity"] for item in inventory_items),
-        "reserved_quantity": sum(item["reserved_quantity"] for item in inventory_items),
-    }
+    summary = get_inventory_summary(request.user)
+    browser_view = resolve_browser_view(filter_params, SET_VIEW)
+    collection_page = list_my_inventory_page(request.user, filter_params) if browser_view == CARD_VIEW else None
+    inventory_items = collection_page["results"] if collection_page else []
+    collection_books = list_collection_set_summaries(request.user, filter_params) if browser_view == SET_VIEW else []
+    collection_shelves = list_collection_game_summaries(request.user, filter_params) if browser_view == SHELF_VIEW else []
+    browser_count = collection_page["count"] if collection_page else 0
+    if browser_view == SET_VIEW:
+        browser_count = sum(book["record_count"] for book in collection_books)
+    elif browser_view == SHELF_VIEW:
+        browser_count = sum(shelf["record_count"] for shelf in collection_shelves)
 
     return render(
         request,
@@ -293,6 +314,10 @@ def collection(request):
                 filter_params,
                 mode="collection",
                 default_view=SET_VIEW,
+                external_pagination=collection_page if browser_view == CARD_VIEW else None,
+                books=collection_books,
+                shelves=collection_shelves,
+                total_count=browser_count,
             ),
             "collection_value": collection_value,
             "summary": summary,

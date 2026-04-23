@@ -108,6 +108,40 @@ class CatalogModelTests(TestCase):
 
 
 class ImportPokemonCardsDatasetCommandTests(TestCase):
+    def test_duplicate_import_rows_create_one_image_per_variant(self):
+        with TemporaryDirectory() as directory:
+            csv_path = Path(directory) / "pokemon-cards.csv"
+            csv_path.write_text(
+                "\n".join(
+                    [
+                        "id,image_url,caption,name,hp,set_name",
+                        (
+                            "base1-4,https://example.com/charizard-old.png,"
+                            "\"A Stage 2 Pokemon Card of type Fire with the title Charizard and 120 HP "
+                            "of rarity Rare Holo evolved from Charmeleon from the set Base.\","
+                            "Charizard,120,Base"
+                        ),
+                        (
+                            "base1-4,https://example.com/charizard-new.png,"
+                            "\"A Stage 2 Pokemon Card of type Fire with the title Charizard and 120 HP "
+                            "of rarity Rare Holo evolved from Charmeleon from the set Base.\","
+                            "Charizard,120,Base"
+                        ),
+                    ]
+                ),
+                encoding="utf-8",
+            )
+            output = StringIO()
+
+            call_command("import_pokemon_cards_dataset", str(csv_path), stdout=output)
+
+        self.assertEqual(CardVariant.objects.count(), 1)
+        self.assertEqual(CardImage.objects.count(), 1)
+        self.assertEqual(
+            CardVariant.objects.get(card__name="Charizard").image.image_url,
+            "https://example.com/charizard-new.png",
+        )
+
     def test_imports_default_sets_repeatably_without_duplicates(self):
         with TemporaryDirectory() as directory:
             csv_path = Path(directory) / "pokemon-cards.csv"

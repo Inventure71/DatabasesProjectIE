@@ -13,7 +13,7 @@
     <p class="hero__subtitle">Discover thousands of cards, manage your collection, and trade with collectors worldwide.</p>
 
     <form class="search-form" method="GET" action="{% url 'catalog' %}">
-        <input type="text" name="q" placeholder="Search by card name, set, rarity…" value="{{ request.GET.q }}">
+        <input type="text" name="q" placeholder="Search name, type, artist, collector #..." value="{{ request.GET.q }}">
         <button type="submit" class="btn btn-gold">Search</button>
     </form>
 </section>

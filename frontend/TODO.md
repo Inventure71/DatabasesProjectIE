@@ -11,7 +11,9 @@ This file tracks frontend work now that `frontend/` is a sibling Django app.
 - [x] Real backend APIs remain reserved under `/api/`
 - [x] Catalog and marketplace pages now read real backend-backed data through frontend services
 - [x] Home search submits to catalog filtering instead of staying on the home page
+- [x] Catalog search uses database-side, MySQL-safe `LIKE` filtering over non-filter card identity fields, without a schema change.
 - [x] Catalog page results are paginated so large card sets are sliced by the database
+- [x] Catalog set-book and game-shelf summaries are computed with database `GROUP BY` annotations instead of grouping the full catalog in Python.
 - [x] Home featured cards show the current month's top sold variants and latest listings are limited in the database before rendering
 - [x] Listing detail buy form now uses the backend purchase workflow
 - [x] Authenticated users can view their collection, estimated value, owned quantities, available stock, and reserved stock
@@ -38,7 +40,9 @@ This file tracks frontend work now that `frontend/` is a sibling Django app.
 - [x] Home central showcase displays the most expensive card sold in the current month, with a featured-card fallback when no monthly sale exists
 - [x] Home central showcase copy/card layout is centered as a paired group, with tighter desktop spacing and a centered mobile stack
 - [x] Home latest listings now appear above featured cards, and their browse link opens the shared catalog browser filtered to available cards.
+- [x] Home Featured Cards fills unsold display slots from catalog variants when fewer than six distinct cards were sold this month.
 - [x] Database-backed frontend sections now include query walkthrough popups that explain the relevant Django ORM path, tables, filtering steps, ordering, and limits.
+- [x] Collection summary totals, owned-card pagination, listed-only filtering, and set/shelf summaries now use SQL aggregates, `EXISTS`, and `LIMIT` instead of materializing the whole collection first.
 - [x] Visible website brand and page-title references now use `TCGNET`.
 - [x] Catalog and collection set filters now require a selected game, only show sets for that game, and ignore stale set filters from other games.
 
@@ -79,7 +83,9 @@ This file tracks frontend work now that `frontend/` is a sibling Django app.
 - [x] Verified current browser unification, listed-card overlay, sold-out ownership, and card-detail listing regressions with focused frontend tests.
 - [x] Verified partial-versus-full listed collection card treatment with focused frontend regression tests.
 - [x] Verified catalog/listings unification and home latest-listings ordering with focused frontend regression tests.
+- [x] Verified Featured Cards fallback fills missing sale slots from catalog variants without duplicating sold variants.
 - [x] Verified query walkthrough popups render on home, catalog, card detail, collection, and listing detail pages with focused frontend regression tests.
+- [x] Verified database-focused catalog and collection query behavior with regression tests for MySQL-safe search, SQL `GROUP BY`, SQL aggregates, SQL `LIMIT`, and limited price history.
 - [x] Verified `TCGNET` website-name replacement with a frontend text scan and focused frontend tests.
 - [x] Verified dependent game/set filter behavior with focused frontend regression tests and the full frontend test suite.
 - [x] Restore the collection add-inventory POST flow using the aggregate inventory model; duplicate owner/card/condition additions merge into one quantity bucket.

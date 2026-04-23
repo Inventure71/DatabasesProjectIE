@@ -274,20 +274,26 @@ class Command(BaseCommand):
         }
 
     def _bulk_upsert_images(self, *, variants, import_rows):
-        variant_ids = [variant.id for variant in variants.values()]
+        desired_by_variant_id = {}
+        for import_row in import_rows:
+            variant = variants[import_row["variant_key"]]
+            desired_by_variant_id[variant.id] = {
+                "variant": variant,
+                "image_url": import_row["image_url"],
+            }
+
         existing_images_by_variant_id = {
             image.card_variant_id: image
-            for image in CardImage.objects.filter(card_variant_id__in=variant_ids)
+            for image in CardImage.objects.filter(card_variant_id__in=desired_by_variant_id)
         }
 
         images_to_create = []
         images_to_update = []
         now = timezone.now()
-        for import_row in import_rows:
-            variant = variants[import_row["variant_key"]]
-            image = existing_images_by_variant_id.get(variant.id)
+        for variant_id, desired in desired_by_variant_id.items():
+            image = existing_images_by_variant_id.get(variant_id)
             if image:
-                image.image_url = import_row["image_url"]
+                image.image_url = desired["image_url"]
                 image.image_hash = ""
                 image.width = None
                 image.height = None
@@ -296,8 +302,8 @@ class Command(BaseCommand):
             else:
                 images_to_create.append(
                     CardImage(
-                        card_variant=variant,
-                        image_url=import_row["image_url"],
+                        card_variant=desired["variant"],
+                        image_url=desired["image_url"],
                         image_hash="",
                         width=None,
                         height=None,
