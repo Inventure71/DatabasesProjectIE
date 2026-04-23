@@ -317,10 +317,31 @@ Default import scope:
   - Stored catalog set code: `JUNGLE`
   - Collector number denominator: `64`
 
+All-set import option:
+
+```bash
+python manage.py import_pokemon_cards_dataset --all-source-sets
+```
+
+- Imports every `set_name` present in the source CSV.
+- Keeps the curated names, codes, and collector totals for known `Base` and
+  `Jungle` rows.
+- For other sets, stores the CSV `set_name` as the catalog set name.
+- For other sets, generates a deterministic uppercase set code from the source
+  set name, for example `Supreme Victors` becomes `SUPREME_VICTORS`.
+- For other sets, infers the collector number denominator from the largest
+  numeric component found in that set's CSV id suffixes.
+- Collector numbers preserve alphanumeric suffixes from the source id, so ids
+  like `ecard2-H1` become values like `H1/32` when the inferred denominator is
+  `32`.
+- `--all-source-sets` is intentionally mutually exclusive with
+  `--source-set-name` so an import run has one clear scope.
+
 Purpose:
 
 - Import the downloaded Pokemon card dataset into the catalog as ownable card variants.
 - Start with the available Base and Jungle Pokemon cards from the downloaded CSV.
+- Support an explicit all-set mode for a fuller database-project dataset load.
 - Avoid duplicate catalog rows when the command is rerun.
 
 Important mapping:
@@ -346,6 +367,11 @@ Important behavior:
 - The current downloaded CSV has 69 rows where `set_name` is `Base` and 63 rows where `set_name` is `Jungle`.
 - The default import currently loads 132 ownable variants from those two sets.
 - This is still a partial classic catalog because the Base import does not include Trainer/Energy cards.
+- The all-set import mode can load the broader CSV without hardcoding every set
+  in advance, but generated collector denominators are inferred from the CSV ids
+  rather than official set metadata.
+- The current downloaded CSV has 13,139 data rows and 147 distinct source set
+  names available to all-set mode.
 - The command is tested by `ImportPokemonCardsDatasetCommandTests`.
 
 ## Catalog Read API

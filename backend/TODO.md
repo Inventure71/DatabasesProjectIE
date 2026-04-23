@@ -271,6 +271,9 @@ Current status:
 - [x] Verified on 2026-04-20 that `python manage.py test catalog`, `python manage.py test users`, `python manage.py test common`, `python manage.py check`, `python manage.py makemigrations --check --dry-run`, and `python manage.py migrate --check` pass after enforcing the rule
 - [x] Removed the old `seed_catalog` sample command so development data comes from the real dataset import path
 - [x] Kept catalog tests independent from sample seed data by creating explicit test fixtures
+- [x] Added `python manage.py import_pokemon_cards_dataset --all-source-sets` for a fuller dataset import path.
+- [x] Documented that all-set mode infers unknown set codes and collector denominators from the CSV, while the default import keeps the curated Base/Jungle MVP scope.
+- [x] Verified the current `pokemon-cards.csv` can be parsed for all-set mode: 13,139 rows, 147 source sets, and 0 unparseable id suffixes.
 
 ## Phase 5: Catalog Read API
 

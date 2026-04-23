@@ -40,6 +40,12 @@ python manage.py migrate
 python manage.py import_pokemon_cards_dataset original_datasets/pokemon-cards/pokemon-cards.csv
 ```
 
+or 
+
+```bash
+python manage.py import_pokemon_cards_dataset --all-source-sets
+```
+
 Verify the import:
 
 ```bash
