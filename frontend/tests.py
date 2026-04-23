@@ -1,4 +1,5 @@
 from decimal import Decimal
+from unittest.mock import patch
 
 from django.contrib.auth import get_user_model
 from django.db import connection
@@ -313,6 +314,26 @@ class FrontendBackendApiWiringTests(TestCase):
         self.assertEqual(collection_response.status_code, 200)
         self.assertContains(collection_response, 'data-kinetic-card')
 
+    def test_catalog_links_to_exact_variant_detail_route(self):
+        second_variant = CardVariant.objects.create(
+            card=self.card,
+            set=self.card_set,
+            collector_number="2/99",
+            rarity=CardVariant.Rarity.UNCOMMON,
+            finish=CardVariant.Finish.NORMAL,
+            current_value=Decimal("13.25"),
+        )
+        CardImage.objects.create(
+            card_variant=second_variant,
+            image_url="https://example.com/backend-dragon-normal.png",
+        )
+
+        response = self.client.get(reverse("catalog"), {"q": "Backend Dragon"})
+
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, reverse("card_variant_detail", kwargs={"variant_id": self.variant.id}))
+        self.assertContains(response, reverse("card_variant_detail", kwargs={"variant_id": second_variant.id}))
+
     def test_collection_page_requires_login(self):
         response = self.client.get(reverse("collection"))
 
@@ -375,7 +396,7 @@ class FrontendBackendApiWiringTests(TestCase):
         self.assertContains(home_response, 'class="listing-card__image-wrap"')
 
         self.assertEqual(catalog_response.status_code, 200)
-        self.assertContains(catalog_response, f'href="{reverse("card_detail", kwargs={"card_id": self.card.pk})}" class="album-card-slot__image album-card-slot__image-link"')
+        self.assertContains(catalog_response, f'href="{reverse("card_variant_detail", kwargs={"variant_id": self.variant.pk})}" class="album-card-slot__image album-card-slot__image-link"')
 
     def test_collection_listed_filter_shows_only_authenticated_users_active_listings(self):
         buyer_inventory = add_inventory_item(
@@ -605,6 +626,36 @@ class FrontendBackendApiWiringTests(TestCase):
         self.assertContains(response, "frontend-test")
         self.assertContains(response, "frontend-seller")
 
+    def test_variant_detail_uses_requested_variant(self):
+        second_variant = CardVariant.objects.create(
+            card=self.card,
+            set=self.card_set,
+            collector_number="2/99",
+            rarity=CardVariant.Rarity.UNCOMMON,
+            finish=CardVariant.Finish.NORMAL,
+            current_value=Decimal("13.25"),
+        )
+        CardImage.objects.create(
+            card_variant=second_variant,
+            image_url="https://example.com/backend-dragon-normal.png",
+        )
+        self.client.force_login(self.buyer)
+
+        response = self.client.get(reverse("card_variant_detail", kwargs={"variant_id": second_variant.id}))
+
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, "13.25")
+        self.assertContains(response, f'name="card_variant_id" value="{second_variant.id}"')
+
+    def test_card_detail_uses_scoped_inventory_lookup(self):
+        self.client.force_login(self.seller)
+
+        with patch("frontend.views.list_my_inventory", side_effect=AssertionError("unscoped inventory used")):
+            response = self.client.get(reverse("card_detail", kwargs={"card_id": self.card.pk}))
+
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, "Your Copies")
+
     def test_card_detail_exposes_add_to_collection_without_purchase_price(self):
         self.client.force_login(self.buyer)
 
@@ -642,7 +693,7 @@ class FrontendBackendApiWiringTests(TestCase):
         )
         self.assertRedirects(
             response,
-            f"{reverse('card_detail', kwargs={'card_id': self.card.pk})}?added={added_item.id}",
+            f"{reverse('card_variant_detail', kwargs={'variant_id': self.variant.pk})}?added={added_item.id}",
         )
         self.assertEqual(added_item.quantity, 2)
         self.assertIsNone(added_item.purchase_price)
@@ -670,7 +721,7 @@ class FrontendBackendApiWiringTests(TestCase):
         existing_item.refresh_from_db()
         self.assertRedirects(
             response,
-            f"{reverse('card_detail', kwargs={'card_id': self.card.pk})}?added={existing_item.id}",
+            f"{reverse('card_variant_detail', kwargs={'variant_id': self.variant.pk})}?added={existing_item.id}",
         )
         self.assertEqual(existing_item.quantity, 4)
         self.assertEqual(
@@ -701,9 +752,8 @@ class FrontendBackendApiWiringTests(TestCase):
         self.assertContains(response, "$50.00")
         self.assertContains(response, 'name="inventory_item_id"')
         self.assertContains(response, f'name="inventory_item_id" value="{unlisted_inventory.id}"')
-        self.assertNotContains(response, f'name="inventory_item_id" value="{self.seller_inventory.id}"')
+        self.assertContains(response, f'name="inventory_item_id" value="{self.seller_inventory.id}"')
         self.assertContains(response, "List Copy")
-        self.assertContains(response, "Already listed")
 
         post_response = self.client.post(
             reverse("card_detail", kwargs={"card_id": self.card.pk}),
@@ -719,7 +769,7 @@ class FrontendBackendApiWiringTests(TestCase):
             inventory_item=unlisted_inventory,
             unit_price=Decimal("73.25"),
         ).latest("id")
-        self.assertRedirects(post_response, f"{reverse('card_detail', kwargs={'card_id': self.card.pk})}?listed={listing.id}")
+        self.assertRedirects(post_response, f"{reverse('card_variant_detail', kwargs={'variant_id': self.variant.pk})}?listed={listing.id}")
 
     def test_fully_sold_inventory_does_not_remain_visible_as_owned(self):
         sold_inventory = add_inventory_item(

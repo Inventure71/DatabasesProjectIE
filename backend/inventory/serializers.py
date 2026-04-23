@@ -45,7 +45,6 @@ class InventoryItemSerializer(serializers.ModelSerializer):
             "quantity",
             "reserved_quantity",
             "available_quantity",
-            "is_for_sale",
             "acquired_at",
             "purchase_price",
         )

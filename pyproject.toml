@@ -1,0 +1,16 @@
+[project]
+name = "databasesprojectie"
+version = "0.1.0"
+requires-python = ">=3.12"
+dependencies = [
+    "asgiref==3.11.1",
+    "Django==6.0.4",
+    "djangorestframework==3.17.1",
+    "psycopg[binary]==3.3.3",
+    "python-dotenv==1.2.2",
+    "sqlparse==0.5.5",
+    "whitenoise==6.12.0",
+]
+
+[project.scripts]
+app = "backend.config.wsgi:application"

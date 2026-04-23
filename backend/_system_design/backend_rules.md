@@ -5,7 +5,7 @@ This file records backend architectural rules and decisions. Treat it as a syste
 ## Current Backend Scope
 
 - Backend only. Ignore frontend work while following this backend plan.
-- Stack: Django, Django REST Framework, MySQL, Django built-in auth.
+- Stack: Django, Django REST Framework, PostgreSQL, Django built-in auth.
 - Backend code lives under `backend/`.
 - Backend planning and status lives in `backend/TODO.md`.
 - Backend system design documentation lives under `backend/_system_design/`.

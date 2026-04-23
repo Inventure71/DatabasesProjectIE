@@ -29,7 +29,6 @@ class InventoryItem(TimeStampedModel):
     condition = models.CharField(max_length=40, choices=Condition.choices)
     quantity = models.PositiveIntegerField()
     reserved_quantity = models.PositiveIntegerField(default=0)
-    is_for_sale = models.BooleanField(default=False)
     acquired_at = models.DateField(default=timezone.localdate)
     purchase_price = models.DecimalField(max_digits=10, decimal_places=2, null=True, blank=True)
 
@@ -38,7 +37,6 @@ class InventoryItem(TimeStampedModel):
         ordering = ("owner_id", "card_variant_id", "condition")
         indexes = [
             models.Index(fields=("owner", "card_variant"), name="inventory_owner_variant_idx"),
-            models.Index(fields=("owner", "is_for_sale"), name="inventory_owner_sale_idx"),
         ]
         constraints = [
             models.UniqueConstraint(

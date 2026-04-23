@@ -6,8 +6,8 @@ This file tracks frontend work now that `frontend/` is a sibling Django app.
 
 - [x] Frontend app imported from `origin/Andres`
 - [x] Frontend pages mounted at `/`
-- [x] Fake catalog and listing data moved into `frontend/services/`
-- [x] Mock JSON endpoints mounted under `/mock-api/`
+- [x] Real catalog and listing data are provided through `frontend/services/`
+- [x] Stale mock JSON endpoints under `/mock-api/` were removed
 - [x] Real backend APIs remain reserved under `/api/`
 - [x] Catalog and marketplace pages now read real backend-backed data through frontend services
 - [x] Home search submits to catalog filtering instead of staying on the home page
@@ -26,6 +26,7 @@ This file tracks frontend work now that `frontend/` is a sibling Django app.
 - [x] Shared card album entries are compact enough for practical page-by-page scanning.
 - [x] Catalog album card entries use a larger card image and place value on its own row for easier scanning.
 - [x] Catalog album card images and home latest-listing images link to their detail pages.
+- [x] Catalog/detail navigation is variant-aware, so a selected printing opens by `CardVariant.id` instead of falling back to the first variant for a card.
 - [x] My Collection card view renders as a sleeve-only album page; selling is no longer exposed inside collection album slots.
 - [x] Shared browser controls clear stale Set/Game filters when moving to book-cover or shelf views, and sidebar search input switches the shared browser back to card view.
 - [x] Shared browser filter, pagination, set-book, shelf, and visualization links target the browser results anchor so full-page GET refreshes return near the active browsing controls instead of the page top.
@@ -42,9 +43,9 @@ This file tracks frontend work now that `frontend/` is a sibling Django app.
 
 - Keep templates and static assets in `frontend/`.
 - Use `frontend/services/` as the boundary between pages and data.
-- Use `/mock-api/...` only for simulated frontend JSON.
+- Do not mount `/mock-api/...` routes unless a future JavaScript feature explicitly needs temporary simulated JSON.
 - Do not create fake endpoints under `/api/...`; that namespace belongs to the real backend.
-- Replace mock service internals with real backend data one feature at a time.
+- Keep service internals backed by real Django models/services when the backend feature exists.
 
 ## Next Steps
 
@@ -63,7 +64,8 @@ This file tracks frontend work now that `frontend/` is a sibling Django app.
 - [ ] Add authenticated user/profile display in the navbar or account page using the backend current-user endpoint.
 - [x] Replace mock-only price history with backend `PriceSnapshot` data.
 - [x] Keep similar-card UI backend-backed by catalog metadata only; full similarity remains optional later work.
-- [ ] Add mock API endpoints only when frontend JavaScript needs JSON.
+- [x] Removed stale mock API endpoints and fake catalog/listing data.
+- [ ] Add a temporary mock API only if future frontend JavaScript needs JSON before the matching backend endpoint exists.
 - [x] Add tests for current frontend/backend wiring.
 - [x] Add regression tests for login session creation and navbar logout behavior.
 - [x] Replace existing catalog/listing/detail/collection card image surfaces with the reusable kinetic card component.

@@ -22,14 +22,17 @@ from frontend.services.backend_api import (
     buy_marketplace_listing,
     create_marketplace_listing_for_user,
     get_collection_value,
+    list_my_inventory_for_variant,
     list_my_inventory,
 )
 from frontend.services.catalog_service import (
     build_price_history,
+    card_variant_belongs_to_card,
     get_card,
     get_card_facets,
+    get_card_variant,
     get_most_expensive_card_sold_this_month,
-    list_active_listings_for_card,
+    list_active_listings_for_variant,
     list_card_page,
     list_cards,
     list_similar_cards,
@@ -93,17 +96,26 @@ def catalog(request):
 
 def card_detail(request, card_id):
     card = get_card(card_id)
+    return _render_card_detail(request, card)
+
+
+def card_variant_detail(request, variant_id):
+    card = get_card_variant(variant_id)
+    return _render_card_detail(request, card)
+
+
+def _render_card_detail(request, card):
     if not card:
         return redirect("catalog")
 
     sell_error = None
     owned_inventory_items = []
 
-    if request.user.is_authenticated:
-        owned_inventory_items = [
-            item for item in list_my_inventory(request.user)
-            if item["card"]["id"] == card_id
-        ]
+    variant_id = card.get("variant_id")
+    detail_url = reverse("card_variant_detail", kwargs={"variant_id": variant_id}) if variant_id else reverse("catalog")
+
+    if request.user.is_authenticated and variant_id:
+        owned_inventory_items = list_my_inventory_for_variant(request.user, variant_id)
 
     if request.method == "POST":
         if not request.user.is_authenticated:
@@ -130,14 +142,15 @@ def card_detail(request, card_id):
                 except ValidationError as exc:
                     sell_error = "; ".join(exc.messages)
                 else:
-                    return redirect(f"{reverse('card_detail', kwargs={'card_id': card_id})}?listed={listing['id']}")
+                    return redirect(f"{detail_url}?listed={listing['id']}")
 
     return render(
         request,
         "card_detail.html",
         {
             "card": card,
-            "active_listings": list_active_listings_for_card(card_id),
+            "detail_url": detail_url,
+            "active_listings": list_active_listings_for_variant(variant_id) if variant_id else [],
             "price_history": build_price_history(card),
             "similar_cards": list_similar_cards(card),
             "owned_inventory_items": owned_inventory_items,
@@ -168,7 +181,7 @@ def add_to_collection(request):
         return _redirect_card_add_error(request.POST.get("card_id"))
 
     card = get_card(card_id)
-    if not card or card.get("variant_id") != card_variant_id:
+    if not card or not card_variant_belongs_to_card(card_id=card_id, variant_id=card_variant_id):
         return _redirect_card_add_error(card_id)
 
     try:
@@ -181,7 +194,7 @@ def add_to_collection(request):
     except ValidationError:
         return _redirect_card_add_error(card_id)
 
-    return redirect(f"{reverse('card_detail', kwargs={'card_id': card_id})}?added={item['id']}")
+    return redirect(f"{reverse('card_variant_detail', kwargs={'variant_id': card_variant_id})}?added={item['id']}")
 
 
 def _redirect_card_add_error(card_id):

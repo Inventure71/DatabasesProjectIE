@@ -8,7 +8,7 @@ This file documents how the backend is currently structured. It should be update
 - Backend source root: `backend/`
 - Frontend source root: `frontend/`
 - Django settings module: `config.settings`
-- Database: MySQL
+- Database: PostgreSQL
 - API framework: Django REST Framework
 - Auth foundation: Django built-in auth
 - Shared infrastructure app: `common`
@@ -16,6 +16,14 @@ This file documents how the backend is currently structured. It should be update
 The root `manage.py` prepends `backend/` to `sys.path`. That keeps backend
 apps importable as `common`, `catalog`, `inventory`, `users`, `marketplace`,
 and `pricing` while allowing `frontend/` to live as a sibling folder.
+
+Deployment note:
+
+- Production configuration now prefers `DATABASE_URL` with a PostgreSQL URL.
+- `backend/config/wsgi.py` and `backend/config/asgi.py` also prepend
+  `backend/` to `sys.path`, so Vercel can import `backend.config.wsgi` while the
+  Django settings module remains `config.settings`.
+- Static assets are collected into `staticfiles/` and served through WhiteNoise.
 
 ## Frontend Integration Boundary
 

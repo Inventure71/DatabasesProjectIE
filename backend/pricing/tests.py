@@ -4,7 +4,9 @@ from decimal import Decimal
 from django.contrib import admin
 from django.contrib.auth import get_user_model
 from django.core.exceptions import ValidationError
+from django.db import connection
 from django.test import TestCase
+from django.test.utils import CaptureQueriesContext
 from django.urls import reverse
 from django.utils import timezone
 from rest_framework import status
@@ -215,6 +217,24 @@ class PricingServiceTests(PricingTestCase):
 
         self.assertEqual(total_value, Decimal("251.00"))
 
+    def test_estimate_collection_value_uses_database_aggregate(self):
+        owner = get_user_model().objects.create_user(username="pricing-aggregate-owner")
+        self.variant.current_value = Decimal("125.50")
+        self.variant.save(update_fields=("current_value", "updated_at"))
+        InventoryItem.objects.create(
+            owner=owner,
+            card_variant=self.variant,
+            condition=InventoryItem.Condition.NEAR_MINT,
+            quantity=2,
+        )
+
+        with CaptureQueriesContext(connection) as queries:
+            total_value = estimate_collection_value(owner=owner)
+
+        self.assertEqual(total_value, Decimal("251.00"))
+        self.assertEqual(len(queries), 1)
+        self.assertIn("SUM", queries[0]["sql"].upper())
+
 
 class PricingAdminTests(TestCase):
     def test_price_snapshot_admin_is_optimized_for_variant_inspection(self):
@@ -261,10 +281,29 @@ class PricingApiTests(APITestCase):
         )
 
         self.assertEqual(response.status_code, status.HTTP_200_OK)
-        self.assertEqual([row["id"] for row in response.data], [newer.id, older.id])
-        self.assertEqual(response.data[0]["price"], "125.50")
-        self.assertEqual(response.data[0]["currency"], "EUR")
-        self.assertEqual(response.data[0]["source_name"], "manual")
+        self.assertEqual([row["id"] for row in response.data["results"]], [newer.id, older.id])
+        self.assertEqual(response.data["results"][0]["price"], "125.50")
+        self.assertEqual(response.data["results"][0]["currency"], "EUR")
+        self.assertEqual(response.data["results"][0]["source_name"], "manual")
+
+    def test_variant_price_history_endpoint_is_paginated(self):
+        for index in range(30):
+            record_price_snapshot(
+                card_variant=self.variant,
+                price=Decimal("100.00") + index,
+                source_name="manual",
+                captured_at=timezone.now() - timedelta(minutes=index),
+                update_current_value=False,
+            )
+
+        response = self.client.get(
+            reverse("pricing-variant-history", kwargs={"variant_id": self.variant.pk})
+        )
+
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertEqual(response.data["count"], 30)
+        self.assertEqual(len(response.data["results"]), 24)
+        self.assertIn("next", response.data)
 
     def test_variant_price_history_endpoint_returns_not_found_for_missing_variant(self):
         response = self.client.get(reverse("pricing-variant-history", kwargs={"variant_id": 999999}))

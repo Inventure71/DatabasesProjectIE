@@ -363,9 +363,8 @@ class ListingServiceTests(TestCase):
         listing.quantity_available = 0
         listing.save(update_fields=("quantity_available", "updated_at"))
 
-        sold_out_listing = mark_listing_sold_out(listing=listing, seller=self.seller)
-
-        self.assertEqual(sold_out_listing.status, MarketListing.Status.SOLD_OUT)
+        with self.assertRaises(ValidationError):
+            mark_listing_sold_out(listing=listing, seller=self.seller)
 
     def test_listing_transitions_reject_wrong_seller(self):
         listing = create_listing(

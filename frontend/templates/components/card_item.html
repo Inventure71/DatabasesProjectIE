@@ -1,4 +1,4 @@
-<a href="{% url 'card_detail' card.id %}" class="card-tile">
+<a href="{% url 'card_variant_detail' card.variant_id %}" class="card-tile">
  
     <div class="card-tile__image-wrap">
         {% include "components/kinetic_card.html" with card=card kinetic_card_class="kinetic-card--tile" %}

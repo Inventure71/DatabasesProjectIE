@@ -171,6 +171,17 @@ def get_card(card_id):
     return _variant_to_frontend_card(variant)
 
 
+def get_card_variant(variant_id):
+    variant = _display_variant_queryset().filter(pk=variant_id).first()
+    if variant is None:
+        return None
+    return _variant_to_frontend_card(variant)
+
+
+def card_variant_belongs_to_card(*, card_id, variant_id):
+    return CardVariant.objects.filter(pk=variant_id, card_id=card_id).exists()
+
+
 def get_card_facets():
     variants = CardVariant.objects.select_related("card__game", "set")
     return {
@@ -182,10 +193,10 @@ def get_card_facets():
     }
 
 
-def list_active_listings_for_card(card_id):
+def list_active_listings_for_variant(variant_id):
     listings = (
         MarketListing.objects.filter(
-            inventory_item__card_variant__card_id=card_id,
+            inventory_item__card_variant_id=variant_id,
             status=MarketListing.Status.ACTIVE,
             quantity_available__gt=0,
         )
