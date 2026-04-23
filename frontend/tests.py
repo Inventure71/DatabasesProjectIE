@@ -152,6 +152,41 @@ class FrontendBackendApiWiringTests(TestCase):
         self.assertIsNone(options["Shelf"].get("game"))
         self.assertEqual(options["Shelf"].get("set"), "Backend Set")
 
+    def test_catalog_set_filter_requires_selected_game(self):
+        other_game = CardGame.objects.create(name="Other TCG", slug="other-tcg")
+        other_set = CardSet.objects.create(game=other_game, name="Other Set", code="OTHER")
+        other_card = Card.objects.create(game=other_game, name="Other Dragon")
+        CardVariant.objects.create(card=other_card, set=other_set, collector_number="1/10")
+
+        default_response = self.client.get(reverse("catalog"))
+        selected_game_response = self.client.get(reverse("catalog"), {"game": "Backend TCG"})
+
+        self.assertEqual(default_response.status_code, 200)
+        self.assertEqual(default_response.context["sets"], [])
+        self.assertContains(default_response, "Choose a game first")
+
+        self.assertEqual(selected_game_response.status_code, 200)
+        self.assertEqual(selected_game_response.context["sets"], ["Backend Set"])
+        self.assertContains(selected_game_response, "Backend Set")
+        self.assertNotIn("Other Set", selected_game_response.context["sets"])
+
+    def test_catalog_ignores_stale_set_filter_from_another_game(self):
+        other_game = CardGame.objects.create(name="Other TCG", slug="other-tcg")
+        CardSet.objects.create(game=other_game, name="Other Set", code="OTHER")
+
+        response = self.client.get(
+            reverse("catalog"),
+            {
+                "game": "Backend TCG",
+                "set": "Other Set",
+            },
+        )
+
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, "Backend Dragon")
+        self.assertEqual(response.context["sets"], ["Backend Set"])
+        self.assertNotIn("Other Set", response.context["sets"])
+
     def test_sidebar_search_inputs_switch_shared_browser_forms_to_card_view(self):
         self.client.force_login(self.seller)
         responses = [
@@ -501,7 +536,7 @@ class FrontendBackendApiWiringTests(TestCase):
         )
         self.client.force_login(self.seller)
 
-        response = self.client.get(reverse("collection"), {"view": "card", "set": "Jungle"})
+        response = self.client.get(reverse("collection"), {"view": "card", "game": "Backend TCG", "set": "Jungle"})
         default_response = self.client.get(reverse("collection"))
 
         self.assertEqual(response.status_code, 200)
@@ -633,7 +668,7 @@ class FrontendBackendApiWiringTests(TestCase):
 
         response = self.client.get(
             reverse("collection"),
-            {"view": "card", "set": "Jungle", "my_listings": "listed"},
+            {"view": "card", "game": "Backend TCG", "set": "Jungle", "my_listings": "listed"},
         )
         default_response = self.client.get(reverse("collection"), {"view": "card", "my_listings": "listed"})
 
