@@ -379,6 +379,12 @@ class ListingServiceTests(TestCase):
         with self.assertRaises(ValidationError):
             cancel_listing(listing=listing, seller=self.other_user)
 
+    def test_postgresql_indexes_match_active_listing_query_patterns(self):
+        index_names = {index.name for index in MarketListing._meta.indexes}
+
+        self.assertIn("listing_active_new_idx", index_names)
+        self.assertIn("listing_active_inventory_idx", index_names)
+
 
 class MarketplaceAdminTests(TestCase):
     def test_listing_admin_is_optimized_for_seller_inventory_and_variant_inspection(self):

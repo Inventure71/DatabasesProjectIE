@@ -32,7 +32,7 @@ business rules exposed by `/api/...`.
 Current backend wiring:
 
 - Catalog pages read real `Card`, `CardVariant`, `CardSet`, and `CardImage` data.
-- Catalog pages request paginated service results so large catalogs are sliced by the database before template rendering. Catalog set-book and game-shelf summaries are produced by database `GROUP BY` queries with `Count` and `Sum` annotations instead of loading the full filtered catalog into Python.
+- Catalog pages request paginated service results so large catalogs are sliced by the database before template rendering. Catalog set-book and game-shelf summaries are produced by database `GROUP BY` queries with `Count` and `Sum` annotations instead of loading the full filtered catalog into Python. Book and shelf cover cards are selected with PostgreSQL `DISTINCT ON`.
 - The home page requests only the featured top-sold cards and latest listings it displays instead of loading every row first.
 - The catalog page is the canonical card browsing surface. Marketplace browsing
   is represented as the same catalog browser with `available=1`, which filters
@@ -40,7 +40,7 @@ Current backend wiring:
   listings.
 - Card detail pages read real active listings and `PriceSnapshot` history.
 - Listing detail purchases call the backend marketplace purchase workflow.
-- The collection page reads authenticated inventory and collection valuation data through `frontend.services.backend_api`. Its summary counters use SQL aggregate queries; its card view uses database pagination; its set-book and game-shelf summaries use database grouping; and its listed-only filter uses an `EXISTS` subquery against active marketplace listings.
+- The collection page reads authenticated inventory and collection valuation data through `frontend.services.backend_api`. Its summary counters use SQL aggregate queries; its card view uses database pagination; its set-book and game-shelf summaries use database grouping; its cover rows use PostgreSQL `DISTINCT ON`; and its listed-only filter uses an `EXISTS` subquery against active marketplace listings.
 - The collection add-inventory POST flow uses the backend aggregate inventory service. Adding the same card variant in the same condition increases the existing inventory quantity instead of creating a separate physical-copy row.
 - Card detail pages expose add-to-collection as a secondary `Own this card?` disclosure for authenticated users. Opening it reveals the owned-copy form, which posts card variant id, condition, and quantity to `/collection/add/`; it intentionally does not collect purchase price.
 - Collection sell forms call the marketplace listing service through `create_marketplace_listing_for_user`, so stock reservation and ownership validation stay in the backend service layer.
@@ -115,13 +115,12 @@ Current frontend UI boundary:
   section. Buying remains in the active marketplace listings area on the same
   card detail page.
 - The home search form submits to `/catalog/` with the `q` query parameter, so search uses the catalog filtering path.
-- Catalog text search uses database-side, MySQL-safe `icontains`/`LIKE`
-  filtering over non-filter card identity fields: card name, card type,
-  subtype, artist, collector number, and edition label. Game, set, rarity,
-  language, price, and availability remain explicit filters instead of being
-  mixed into free-text search. If the project later needs ranked/tokenized
-  search at scale, add a database-supported full-text index and update the
-  service contract deliberately rather than importing a PostgreSQL-only helper.
+- Catalog and collection text search use PostgreSQL trigram similarity over
+  non-filter card identity fields: card name, card type, subtype, artist,
+  collector number, and edition label. The schema enables `pg_trgm` and adds
+  GIN trigram indexes for those fields. Game, set, rarity, language, price, and
+  availability remain explicit filters instead of being mixed into free-text
+  search.
 - On the home page, latest active listings appear above featured catalog cards.
   The latest-listings browse link opens the catalog browser with `available=1`
   so listed cards and catalog cards use one shared page.
@@ -136,9 +135,10 @@ Current frontend UI boundary:
   owned copies, card-detail active listings, price history, similar cards,
   collection summary, collection browser, and listing detail.
   Popup content must stay synchronized with the real query path. Catalog and
-  collection popups now explicitly describe `LIKE` search, `EXISTS` filters,
-  database pagination, SQL aggregate summaries, `GROUP BY` book/shelf
-  summaries, and the 24-row price-history limit.
+  collection popups now explicitly describe PostgreSQL trigram search, GIN
+  indexes, `EXISTS` filters, database pagination, SQL aggregate summaries,
+  `GROUP BY` book/shelf summaries, PostgreSQL `DISTINCT ON` cover selection,
+  and the 24-row price-history limit.
 - `frontend/templates/components/kinetic_card.html` owns the reusable physical-card visual treatment. It renders only the card surface so existing page components can decide whether the card is linked, listed, or surrounded by metadata.
 - `frontend/static/js/kinetic-card.js` progressively enhances elements marked with `data-kinetic-card`; without JavaScript the card remains a normal image surface. The `data-kinetic-card` element is the stable pointer hitbox, while the nested `.kinetic-card__tilt` layer receives the 3D transform so corner pointer math does not reset when the card tilts.
 - Card catalog tiles, listing cards, listing rows, detail pages, collection rows, active listing rows, similar cards, and the home monthly showcase all reuse `kinetic_card.html` for visual card rendering.

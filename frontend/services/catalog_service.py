@@ -1,8 +1,9 @@
 from decimal import Decimal
 
+from django.contrib.postgres.search import TrigramSimilarity
 from django.core.paginator import Paginator
-from django.db.models import Count, DecimalField, Exists, ExpressionWrapper, F, OuterRef, Q, Sum, Value
-from django.db.models.functions import Coalesce
+from django.db.models import Count, DecimalField, Exists, ExpressionWrapper, F, OuterRef, Sum, Value
+from django.db.models.functions import Coalesce, Greatest
 from django.utils import timezone
 
 from catalog.models import Card, CardGame, CardSet, CardVariant
@@ -12,6 +13,7 @@ from pricing.models import PriceSnapshot
 RARITIES = [choice[0] for choice in CardVariant.Rarity.choices]
 DEFAULT_PAGE_SIZE = 24
 MAX_PAGE_SIZE = 100
+SEARCH_SIMILARITY_THRESHOLD = 0.1
 ZERO_MONEY = Value(Decimal("0"), output_field=DecimalField(max_digits=12, decimal_places=2))
 
 
@@ -237,13 +239,8 @@ def _filter_and_sort_display_variants(params):
     available_only = _available_only(params)
 
     if query:
-        queryset = queryset.filter(
-            Q(card__name__icontains=query)
-            | Q(card__card_type__icontains=query)
-            | Q(card__subtype__icontains=query)
-            | Q(card__artist_name__icontains=query)
-            | Q(collector_number__icontains=query)
-            | Q(edition_label__icontains=query)
+        queryset = queryset.annotate(search_rank=_catalog_search_rank(query)).filter(
+            search_rank__gt=SEARCH_SIMILARITY_THRESHOLD
         )
     if game:
         queryset = queryset.filter(card__game__name=game)
@@ -273,7 +270,10 @@ def _filter_and_sort_display_variants(params):
     elif sort == "newest":
         queryset = queryset.order_by("-created_at", "id")
     else:
-        queryset = queryset.order_by("card__name", "set__name", "collector_number", "id")
+        if query:
+            queryset = queryset.order_by("-search_rank", "card__name", "set__name", "collector_number", "id")
+        else:
+            queryset = queryset.order_by("card__name", "set__name", "collector_number", "id")
 
     return queryset
 
@@ -430,7 +430,13 @@ def _cover_cards_by_set(params, set_ids):
     covers = {}
     if not set_ids:
         return covers
-    for variant in _filter_and_sort_display_variants(params).filter(set_id__in=set_ids):
+    variants = (
+        _filter_and_sort_display_variants(params)
+        .filter(set_id__in=set_ids)
+        .order_by("set_id", "card__name", "collector_number", "id")
+        .distinct("set_id")
+    )
+    for variant in variants:
         covers.setdefault(variant.set_id, _variant_to_frontend_card(variant))
     return covers
 
@@ -439,9 +445,26 @@ def _cover_cards_by_game(params, games):
     covers = {}
     if not games:
         return covers
-    for variant in _filter_and_sort_display_variants(params).filter(card__game__name__in=games):
+    variants = (
+        _filter_and_sort_display_variants(params)
+        .filter(card__game__name__in=games)
+        .order_by("card__game__name", "card__name", "set__name", "collector_number", "id")
+        .distinct("card__game__name")
+    )
+    for variant in variants:
         covers.setdefault(variant.card.game.name, _variant_to_frontend_card(variant))
     return covers
+
+
+def _catalog_search_rank(query):
+    return Greatest(
+        TrigramSimilarity("card__name", query),
+        TrigramSimilarity("card__card_type", query),
+        TrigramSimilarity("card__subtype", query),
+        TrigramSimilarity("card__artist_name", query),
+        TrigramSimilarity("collector_number", query),
+        TrigramSimilarity("edition_label", query),
+    )
 
 
 def _query_with(params, **updates):

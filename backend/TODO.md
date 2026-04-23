@@ -59,6 +59,7 @@ Current status:
 - [x] Confirmed similarity is optional later work and not part of the first transactional marketplace slice
 - [x] Inventory uses an aggregate stock rule: one row per owner, card variant, and condition; duplicate additions increase quantity on that row.
 - [x] Listing creation reserves quantity from aggregate inventory, and purchase/cancel flows update reserved stock transactionally.
+- [x] Added PostgreSQL-focused query support: `pg_trgm` catalog search indexes, partial active-listing indexes, partial active-inventory index, and descending price-history index.
 
 ## Phase 1: Backend Foundation
 
@@ -123,6 +124,7 @@ Current status:
 - [x] Verified from user run output that the Django development server starts on `http://127.0.0.1:8000/`
 - [x] Verified on 2026-04-20 that `backend/README.md` documents setup, database creation, checks, migrations, and local server startup
 - [x] Updated setup docs on 2026-04-23 to explain the PostgreSQL role/user password, `cards_marketplace` database ownership, direct `psql` credential check, and local run/test commands.
+- [x] Added PostgreSQL-specific migrations for trigram search and query-pattern indexes; no `EXPLAIN ANALYZE` documentation was added because that was explicitly excluded from this implementation pass.
 
 ## Phase 2: Shared Backend Conventions
 

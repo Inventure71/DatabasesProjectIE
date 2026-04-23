@@ -63,6 +63,11 @@ class PriceSnapshotModelTests(PricingTestCase):
         with self.assertRaises(ValidationError):
             snapshot.full_clean()
 
+    def test_postgresql_index_matches_latest_variant_price_history_query(self):
+        index_names = {index.name for index in PriceSnapshot._meta.indexes}
+
+        self.assertIn("price_variant_latest_idx", index_names)
+
 
 class PricingServiceTests(PricingTestCase):
     def test_record_price_snapshot_stores_snapshot_and_updates_current_value(self):

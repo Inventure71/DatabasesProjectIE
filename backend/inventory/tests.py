@@ -82,6 +82,11 @@ class InventoryModelTests(TestCase):
             1,
         )
 
+    def test_postgresql_index_matches_active_owner_collection_queries(self):
+        index_names = {index.name for index in InventoryItem._meta.indexes}
+
+        self.assertIn("inventory_active_owner_idx", index_names)
+
     def test_quantity_can_be_zero_after_stock_is_sold(self):
         item = InventoryItem(
             owner=self.owner,

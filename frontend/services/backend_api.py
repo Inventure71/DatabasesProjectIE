@@ -1,9 +1,10 @@
 from decimal import Decimal
 
+from django.contrib.postgres.search import TrigramSimilarity
 from django.core.exceptions import ValidationError
 from django.core.paginator import Paginator
-from django.db.models import Count, DecimalField, Exists, ExpressionWrapper, F, OuterRef, Prefetch, Q, Sum, Value
-from django.db.models.functions import Coalesce
+from django.db.models import Count, DecimalField, Exists, ExpressionWrapper, F, OuterRef, Prefetch, Sum, Value
+from django.db.models.functions import Coalesce, Greatest
 from django.http import Http404
 
 from catalog.models import CardVariant
@@ -25,6 +26,7 @@ from users.serializers import CurrentUserSerializer
 
 
 COLLECTION_BROWSER_PAGE_SIZE = 12
+SEARCH_SIMILARITY_THRESHOLD = 0.1
 ZERO_MONEY = Value(Decimal("0"), output_field=DecimalField(max_digits=12, decimal_places=2))
 
 
@@ -305,12 +307,10 @@ def _filter_user_inventory_queryset(user, params):
     max_price = params.get("max_price", "")
 
     if query:
-        queryset = queryset.filter(
-            Q(card_variant__card__name__icontains=query)
-            | Q(card_variant__card__card_type__icontains=query)
-            | Q(card_variant__card__subtype__icontains=query)
-            | Q(card_variant__collector_number__icontains=query)
-            | Q(card_variant__edition_label__icontains=query)
+        queryset = (
+            queryset.annotate(search_rank=_inventory_search_rank(query))
+            .filter(search_rank__gt=SEARCH_SIMILARITY_THRESHOLD)
+            .order_by("-search_rank", "card_variant__card__name", "condition")
         )
     if game:
         queryset = queryset.filter(card_variant__card__game__name=game)
@@ -391,7 +391,13 @@ def _inventory_cover_cards_by_set(user, params, set_ids):
     covers = {}
     if not set_ids:
         return covers
-    for item in _filter_user_inventory_queryset(user, params).filter(card_variant__set_id__in=set_ids):
+    items = (
+        _filter_user_inventory_queryset(user, params)
+        .filter(card_variant__set_id__in=set_ids)
+        .order_by("card_variant__set_id", "card_variant__card__name", "id")
+        .distinct("card_variant__set_id")
+    )
+    for item in items:
         covers.setdefault(item.card_variant.set_id, _inventory_item_to_frontend(item)["card"])
     return covers
 
@@ -400,9 +406,25 @@ def _inventory_cover_cards_by_game(user, params, games):
     covers = {}
     if not games:
         return covers
-    for item in _filter_user_inventory_queryset(user, params).filter(card_variant__card__game__name__in=games):
+    items = (
+        _filter_user_inventory_queryset(user, params)
+        .filter(card_variant__card__game__name__in=games)
+        .order_by("card_variant__card__game__name", "card_variant__card__name", "id")
+        .distinct("card_variant__card__game__name")
+    )
+    for item in items:
         covers.setdefault(item.card_variant.card.game.name, _inventory_item_to_frontend(item)["card"])
     return covers
+
+
+def _inventory_search_rank(query):
+    return Greatest(
+        TrigramSimilarity("card_variant__card__name", query),
+        TrigramSimilarity("card_variant__card__card_type", query),
+        TrigramSimilarity("card_variant__card__subtype", query),
+        TrigramSimilarity("card_variant__collector_number", query),
+        TrigramSimilarity("card_variant__edition_label", query),
+    )
 
 
 def _getlist(params, name):

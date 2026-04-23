@@ -243,16 +243,15 @@ class FrontendBackendApiWiringTests(TestCase):
             "Expected the catalog query to apply the page size in SQL.",
         )
 
-    def test_catalog_search_uses_database_side_mysql_safe_filtering(self):
+    def test_catalog_search_uses_postgresql_trigram_similarity(self):
         with CaptureQueriesContext(connection) as queries:
             response = self.client.get(reverse("catalog"), {"q": "Backend Dragon"})
 
         self.assertEqual(response.status_code, 200)
         self.assertContains(response, "Backend Dragon")
         sql = "\n".join(query["sql"] for query in queries.captured_queries).upper()
-        self.assertIn("LIKE", sql)
-        self.assertNotIn("TO_TSVECTOR", sql)
-        self.assertNotIn("PLAINTO_TSQUERY", sql)
+        self.assertIn("SIMILARITY(", sql)
+        self.assertNotIn("LIKE", sql)
 
     def test_catalog_set_browser_uses_database_grouping_for_book_summaries(self):
         extra_card = Card.objects.create(game=self.game, name="Backend Phoenix")
@@ -274,6 +273,39 @@ class FrontendBackendApiWiringTests(TestCase):
                 for query in queries.captured_queries
             ),
             "Expected catalog set summaries to be grouped by the database.",
+        )
+
+    def test_catalog_set_browser_does_not_run_unused_card_page_query(self):
+        with CaptureQueriesContext(connection) as queries:
+            response = self.client.get(reverse("catalog"), {"view": "set"})
+
+        self.assertEqual(response.status_code, 200)
+        self.assertFalse(
+            any(
+                "CARD_VARIANT" in query["sql"].upper()
+                and "LIMIT 24" in query["sql"].upper()
+                for query in queries.captured_queries
+            ),
+            "Expected set view to avoid the card-page LIMIT query it does not render.",
+        )
+
+    def test_catalog_set_browser_selects_cover_cards_with_postgresql_distinct_on(self):
+        other_set = CardSet.objects.create(game=self.game, name="Backend Other Set", code="BACK2")
+        other_card = Card.objects.create(game=self.game, name="Backend Other Dragon")
+        CardVariant.objects.create(
+            card=other_card,
+            set=other_set,
+            collector_number="2/99",
+            current_value=Decimal("11.00"),
+        )
+
+        with CaptureQueriesContext(connection) as queries:
+            response = self.client.get(reverse("catalog"), {"view": "set"})
+
+        self.assertEqual(response.status_code, 200)
+        self.assertTrue(
+            any("DISTINCT ON" in query["sql"].upper() for query in queries.captured_queries),
+            "Expected PostgreSQL DISTINCT ON to select one cover card per set.",
         )
 
     def test_home_search_form_submits_to_catalog_search(self):
@@ -802,6 +834,33 @@ class FrontendBackendApiWiringTests(TestCase):
                 for query in queries.captured_queries
             ),
             "Expected collection card browsing to apply the visible page limit in SQL.",
+        )
+
+    def test_collection_set_browser_selects_cover_cards_with_postgresql_distinct_on(self):
+        other_set = CardSet.objects.create(game=self.game, name="Owned Other Set", code="OWN2")
+        other_card = Card.objects.create(game=self.game, name="Owned Other Dragon")
+        other_variant = CardVariant.objects.create(
+            card=other_card,
+            set=other_set,
+            collector_number="2/99",
+            current_value=Decimal("11.00"),
+        )
+        add_inventory_item(
+            owner=self.seller,
+            card_variant=other_variant,
+            condition=InventoryItem.Condition.NEAR_MINT,
+            quantity=1,
+            actor=self.seller,
+        )
+        self.client.force_login(self.seller)
+
+        with CaptureQueriesContext(connection) as queries:
+            response = self.client.get(reverse("collection"), {"view": "set"})
+
+        self.assertEqual(response.status_code, 200)
+        self.assertTrue(
+            any("DISTINCT ON" in query["sql"].upper() for query in queries.captured_queries),
+            "Expected PostgreSQL DISTINCT ON to select one collection cover card per set.",
         )
 
     def test_card_detail_uses_real_backend_price_history_and_listings(self):

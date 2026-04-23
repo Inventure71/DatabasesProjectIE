@@ -106,6 +106,25 @@ class CatalogModelTests(TestCase):
         self.assertIsInstance(CardVariant._meta.get_field("set"), models.ForeignKey)
         self.assertIsInstance(CardImage._meta.get_field("card_variant"), models.OneToOneField)
 
+    def test_postgresql_search_indexes_match_catalog_search_fields(self):
+        card_indexes = {index.name for index in Card._meta.indexes}
+        variant_indexes = {index.name for index in CardVariant._meta.indexes}
+
+        self.assertTrue(
+            {
+                "card_name_trgm_idx",
+                "card_type_trgm_idx",
+                "card_subtype_trgm_idx",
+                "card_artist_trgm_idx",
+            }.issubset(card_indexes)
+        )
+        self.assertTrue(
+            {
+                "variant_collector_trgm_idx",
+                "variant_edition_trgm_idx",
+            }.issubset(variant_indexes)
+        )
+
 
 class ImportPokemonCardsDatasetCommandTests(TestCase):
     def test_duplicate_import_rows_create_one_image_per_variant(self):

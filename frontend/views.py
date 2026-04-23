@@ -78,8 +78,8 @@ def home(request):
 def catalog(request):
     filter_params = normalize_catalog_filter_params(request.GET)
     facets = get_card_facets(filter_params)
-    card_page = list_card_page(filter_params)
     browser_view = resolve_browser_view(filter_params, CARD_VIEW)
+    card_page = list_card_page(filter_params) if browser_view == CARD_VIEW else _empty_page()
     catalog_books = list_catalog_set_summaries(filter_params) if browser_view == SET_VIEW else []
     catalog_shelves = list_catalog_game_summaries(filter_params) if browser_view == SHELF_VIEW else []
     browser_records = card_page["results"] if browser_view == CARD_VIEW else []
@@ -106,7 +106,7 @@ def catalog(request):
         "catalog.html",
         {
             "cards": card_page["results"],
-            "result_count": card_page["count"],
+            "result_count": browser_count,
             "browser": browser,
             "pagination": card_page,
             "pagination_query": pagination_query.urlencode(),
@@ -419,3 +419,17 @@ def login_view(request):
 def _optional_decimal(value):
     value = value.strip() if value else ""
     return Decimal(value) if value else None
+
+
+def _empty_page():
+    return {
+        "results": [],
+        "count": 0,
+        "page": 1,
+        "page_size": 0,
+        "num_pages": 1,
+        "has_previous": False,
+        "has_next": False,
+        "previous_page_number": None,
+        "next_page_number": None,
+    }

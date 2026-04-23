@@ -74,18 +74,21 @@ QUERY_EXPLAINERS = {
         "steps": [
             "Start from CardVariant because inventory, listings, and pricing all depend on exact printings.",
             "Join Card, CardGame, CardSet, and CardImage with select_related.",
-            "Apply the sidebar filters in SQL: MySQL-safe LIKE search over identity fields, game, set, rarity, language, and value range.",
+            "Apply the sidebar filters in SQL: PostgreSQL trigram similarity search over identity fields, plus game, set, rarity, language, and value range.",
             "When Only available is checked, add an EXISTS subquery that looks for an active listing with available quantity for the same variant.",
             "For card view, apply sort order, then Paginator adds LIMIT and OFFSET so only the visible page is read.",
             "For book and shelf views, use GROUP BY with Count and Sum annotations so the database computes set/game totals.",
+            "Select one cover card per book or shelf with PostgreSQL DISTINCT ON instead of loading every matching card into Python.",
         ],
         "orm": (
             "CardVariant.objects.select_related('card__game', 'set', 'image')\n"
-            "    .filter(Q(card__name__icontains=q) | Q(collector_number__icontains=q) | ...)\n"
+            "    .annotate(search_rank=Greatest(TrigramSimilarity(...)))\n"
+            "    .filter(search_rank__gt=0.1)\n"
             "    .annotate(has_active_listing=Exists(MarketListing.objects.filter(...)))\n"
             "    .order_by(...)\n"
             "    # Paginator applies LIMIT/OFFSET for card view\n"
-            "queryset.values('set_id', 'set__name').annotate(Count('id'), Sum('current_value'))"
+            "queryset.values('set_id', 'set__name').annotate(Count('id'), Sum('current_value'))\n"
+            "queryset.order_by('set_id', ...).distinct('set_id')"
         ),
     },
     "active_listings": {
@@ -195,17 +198,20 @@ QUERY_EXPLAINERS = {
         "tables": "InventoryItem, MarketListing, CardVariant, Card, CardGame, CardSet, CardImage",
         "steps": [
             "Start from InventoryItem rows owned by request.user with quantity greater than zero.",
-            "Apply browser filters in SQL: search, game, set, rarity, language, value range, and listed-only state.",
+            "Apply browser filters in SQL: PostgreSQL trigram similarity search, game, set, rarity, language, value range, and listed-only state.",
             "For listed-only filtering, use an EXISTS subquery against active MarketListing rows for the inventory item.",
             "For card view, Paginator applies LIMIT 12/OFFSET before inventory rows are converted for templates.",
             "For set books and game shelves, GROUP BY set or game and annotate Count, Sum(quantity), and Sum(quantity * current_value).",
-            "Prefetch active listings only for the visible card rows so listed quantity pills avoid N+1 queries.",
+            "Select one cover card per book or shelf with PostgreSQL DISTINCT ON.",
+            "Prefetch active listings only for the visible card or cover rows so listed quantity pills avoid N+1 queries.",
         ],
         "orm": (
             "InventoryItem.objects.filter(owner=user, quantity__gt=0).filter(...)\n"
+            "    .annotate(search_rank=Greatest(TrigramSimilarity(...)))\n"
             "    .annotate(has_active_listing=Exists(MarketListing.objects.filter(...)))\n"
             "    # Paginator applies LIMIT 12/OFFSET for card view\n"
-            "queryset.values('card_variant__set_id').annotate(Count('id'), Sum('quantity'))"
+            "queryset.values('card_variant__set_id').annotate(Count('id'), Sum('quantity'))\n"
+            "queryset.order_by('card_variant__set_id', ...).distinct('card_variant__set_id')"
         ),
     },
     "listing_detail": {
