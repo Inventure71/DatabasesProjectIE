@@ -11,6 +11,7 @@ https://docs.djangoproject.com/en/6.0/ref/settings/
 """
 
 import os
+import sys
 import urllib.parse
 from pathlib import Path
 from dotenv import load_dotenv
@@ -18,6 +19,8 @@ from dotenv import load_dotenv
 # Build paths inside the project like this: BASE_DIR / 'subdir'.
 BASE_DIR = Path(__file__).resolve().parent.parent
 PROJECT_ROOT = BASE_DIR.parent
+if str(BASE_DIR) not in sys.path:
+    sys.path.insert(0, str(BASE_DIR))
 load_dotenv(PROJECT_ROOT / ".env")
 
 
@@ -93,7 +96,7 @@ TEMPLATES = [
     },
 ]
 
-WSGI_APPLICATION = 'config.wsgi.application'
+WSGI_APPLICATION = 'backend.config.wsgi.application'
 
 
 # Database
