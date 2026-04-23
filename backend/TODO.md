@@ -107,6 +107,11 @@ Current status:
 - [x] Verified on 2026-04-23 that `python manage.py makemigrations --check --dry-run` reports no model changes after the PostgreSQL/Vercel config change; the command warned that no local PostgreSQL server was listening on `127.0.0.1:5432`.
 - [ ] Verify `python manage.py migrate` against the final local or remote PostgreSQL database.
 - [ ] Verify the full test suite against PostgreSQL after the database is available.
+- [x] Updated Django runtime module paths on 2026-04-23 so Vercel can resolve the nested WSGI app as `backend.config.wsgi.application` instead of looking for root `config/wsgi.py`.
+- [x] Verified on 2026-04-23 that `python manage.py migrate --check` exits successfully after the Vercel module-path fix.
+- [ ] Full PostgreSQL test suite is currently blocked by the local database role lacking `CREATEDB`; Django reached PostgreSQL but failed with `permission denied to create database`.
+- [x] Updated and verified static-file settings on 2026-04-23 to use Django 6 `STORAGES["staticfiles"]` with WhiteNoise compressed manifest storage instead of removed `STATICFILES_STORAGE`.
+- [x] Added and verified Vercel production config guards on 2026-04-23 so deployments fail clearly if `DJANGO_DEBUG=True` or `DATABASE_URL` is missing.
 - [x] Moved Django command entrypoint to repository-root `manage.py` so `backend/` and `frontend/` can be sibling folders
 - [x] Verified on 2026-04-20 that root `python manage.py check` passes with no issues
 - [x] Verified on 2026-04-20 that `python manage.py test common catalog users inventory marketplace pricing` runs 46 tests successfully

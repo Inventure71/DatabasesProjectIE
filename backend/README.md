@@ -127,6 +127,10 @@ DJANGO_ALLOWED_HOSTS=.vercel.app
 DATABASE_URL=postgresql://USER:PASSWORD@HOST:PORT/DBNAME?sslmode=require
 ```
 
+Use a hosted PostgreSQL database for `DATABASE_URL`. Vercel cannot connect to a
+database running on your laptop at `127.0.0.1`; from Vercel, `127.0.0.1` means
+the function container itself.
+
 After `vercel link`, prepare the remote database with:
 
 ```bash
