@@ -189,12 +189,17 @@ USE_TZ = True
 
 STATIC_URL = 'static/'
 STATIC_ROOT = PROJECT_ROOT / "staticfiles"
+
+staticfiles_storage_backend = "whitenoise.storage.CompressedManifestStaticFilesStorage"
+if "test" in sys.argv:
+    staticfiles_storage_backend = "django.contrib.staticfiles.storage.StaticFilesStorage"
+
 STORAGES = {
     "default": {
         "BACKEND": "django.core.files.storage.FileSystemStorage",
     },
     "staticfiles": {
-        "BACKEND": "whitenoise.storage.CompressedManifestStaticFilesStorage",
+        "BACKEND": staticfiles_storage_backend,
     },
 }
 
