@@ -1,11 +1,21 @@
 # DatabasesProjectIE
 
+## General Information
+
+This project is a Django + PostgreSQL web application for browsing catalog data and managing a personal physical card collection.
+
+The website includes `?` help buttons next to most query-driven features, each with a simple explanation of how that query works.
+
+## Suggested Solution
+
+Use the deployed solution from https://databases-project-ie.vercel.app/
+
 ## Local Setup
 
 Run these commands from the repository root:
 
 ```bash
-cd /Users/inventure71/VSProjects/School/DatabasesProjectIE
+cd {Project Root}
 
 python3 -m venv .venv
 source .venv/bin/activate
@@ -109,39 +119,4 @@ Run the test suite:
 
 ```bash
 python manage.py test common catalog users inventory marketplace pricing frontend --keepdb
-```
-
-## Deploy On Vercel
-
-This project is configured for Vercel's Django support with:
-
-- `pyproject.toml`: points Vercel at `backend.config.wsgi:application`.
-- `vercel.json`: runs `collectstatic` during the build.
-- `DATABASE_URL`: preferred production PostgreSQL connection setting.
-
-Set these Vercel environment variables before deploying:
-
-```text
-DJANGO_SECRET_KEY=<production-secret>
-DJANGO_DEBUG=False
-DJANGO_ALLOWED_HOSTS=.vercel.app,<your-production-domain-if-any>
-DATABASE_URL=postgresql://USER:PASSWORD@HOST:PORT/DBNAME?sslmode=require
-```
-
-`DATABASE_URL` must point to a hosted PostgreSQL database. The local
-`POSTGRES_*` settings use `127.0.0.1`, which only works on your own machine;
-inside Vercel, `127.0.0.1` is the serverless function container, not your local
-PostgreSQL server.
-
-After linking the project with `vercel link`, run the production database setup from your machine:
-
-```bash
-vercel env run -- python manage.py migrate
-vercel env run -- python manage.py import_pokemon_cards_dataset --all-source-sets
-```
-
-Then deploy:
-
-```bash
-vercel --prod
 ```
