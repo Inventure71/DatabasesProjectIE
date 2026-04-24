@@ -25,6 +25,9 @@ def build_record_browser(
     default_view=CARD_VIEW,
     page_size=DEFAULT_ALBUM_PAGE_SIZE,
     external_pagination=None,
+    books=None,
+    shelves=None,
+    total_count=None,
 ):
     view = resolve_browser_view(params, default_view)
     records = list(records)
@@ -35,10 +38,16 @@ def build_record_browser(
         "mode": mode,
         "view": view,
         "view_options": _view_options(params, view),
-        "count": external_pagination["count"] if external_pagination else len(records),
+        "count": (
+            total_count
+            if total_count is not None
+            else external_pagination["count"]
+            if external_pagination
+            else len(records)
+        ),
         "page": _build_page(records, params, page_size, external_pagination=external_pagination),
-        "books": _build_browser_books(records, params),
-        "shelves": _build_game_shelves(records, params),
+        "books": books if books is not None else _build_browser_books(records, params),
+        "shelves": shelves if shelves is not None else _build_game_shelves(records, params),
     }
 
 

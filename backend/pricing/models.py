@@ -23,6 +23,7 @@ class PriceSnapshot(TimeStampedModel):
         indexes = [
             models.Index(fields=("card_variant", "captured_at"), name="price_variant_captured_idx"),
             models.Index(fields=("source_name", "captured_at"), name="price_source_captured_idx"),
+            models.Index(fields=("card_variant", "-captured_at", "-id"), name="price_variant_latest_idx"),
         ]
         constraints = [
             models.CheckConstraint(condition=models.Q(price__gte=0), name="price_snapshot_price_non_negative"),

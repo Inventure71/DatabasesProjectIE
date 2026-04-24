@@ -1,4 +1,5 @@
 from django.db import models
+from django.contrib.postgres.indexes import GinIndex, OpClass
 
 from common.models import TimeStampedModel
 
@@ -51,6 +52,10 @@ class Card(TimeStampedModel):
         indexes = [
             models.Index(fields=("name",), name="card_name_idx"),
             models.Index(fields=("game", "name"), name="card_game_name_idx"),
+            GinIndex(OpClass("name", name="gin_trgm_ops"), name="card_name_trgm_idx"),
+            GinIndex(OpClass("card_type", name="gin_trgm_ops"), name="card_type_trgm_idx"),
+            GinIndex(OpClass("subtype", name="gin_trgm_ops"), name="card_subtype_trgm_idx"),
+            GinIndex(OpClass("artist_name", name="gin_trgm_ops"), name="card_artist_trgm_idx"),
         ]
 
     def __str__(self):
@@ -88,6 +93,8 @@ class CardVariant(TimeStampedModel):
         indexes = [
             models.Index(fields=("set", "rarity"), name="variant_set_rarity_idx"),
             models.Index(fields=("current_value",), name="variant_value_idx"),
+            GinIndex(OpClass("collector_number", name="gin_trgm_ops"), name="variant_collector_trgm_idx"),
+            GinIndex(OpClass("edition_label", name="gin_trgm_ops"), name="variant_edition_trgm_idx"),
         ]
         constraints = [
             models.CheckConstraint(

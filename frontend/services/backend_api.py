@@ -1,5 +1,10 @@
+from decimal import Decimal
+
+from django.contrib.postgres.search import TrigramSimilarity
 from django.core.exceptions import ValidationError
-from django.db.models import Prefetch
+from django.core.paginator import Paginator
+from django.db.models import Count, DecimalField, Exists, ExpressionWrapper, F, OuterRef, Prefetch, Sum, Value
+from django.db.models.functions import Coalesce, Greatest
 from django.http import Http404
 
 from catalog.models import CardVariant
@@ -20,6 +25,11 @@ from pricing.services import estimate_collection_value, get_variant_price_histor
 from users.serializers import CurrentUserSerializer
 
 
+COLLECTION_BROWSER_PAGE_SIZE = 12
+SEARCH_SIMILARITY_THRESHOLD = 0.1
+ZERO_MONEY = Value(Decimal("0"), output_field=DecimalField(max_digits=12, decimal_places=2))
+
+
 def get_current_user(user):
     return CurrentUserSerializer(user).data
 
@@ -27,6 +37,101 @@ def get_current_user(user):
 def list_my_inventory(user):
     queryset = _user_inventory_queryset(user)
     return [_inventory_item_to_frontend(item) for item in queryset]
+
+
+def list_my_inventory_page(user, params, *, page_size=COLLECTION_BROWSER_PAGE_SIZE):
+    queryset = _filter_user_inventory_queryset(user, params)
+    paginator = Paginator(queryset, page_size)
+    page_obj = paginator.get_page(params.get("page"))
+
+    return {
+        "results": [_inventory_item_to_frontend(item) for item in page_obj.object_list],
+        "count": paginator.count,
+        "page": page_obj.number,
+        "page_size": page_size,
+        "num_pages": paginator.num_pages,
+        "has_previous": page_obj.has_previous(),
+        "has_next": page_obj.has_next(),
+        "previous_page_number": page_obj.previous_page_number() if page_obj.has_previous() else None,
+        "next_page_number": page_obj.next_page_number() if page_obj.has_next() else None,
+    }
+
+
+def get_inventory_summary(user):
+    return _user_inventory_base_queryset(user).aggregate(
+        total_quantity=Coalesce(Sum("quantity"), 0),
+        available_quantity=Coalesce(Sum(F("quantity") - F("reserved_quantity")), 0),
+        reserved_quantity=Coalesce(Sum("reserved_quantity"), 0),
+    )
+
+
+def list_collection_set_summaries(user, params):
+    queryset = _filter_user_inventory_queryset(user, params).order_by()
+    row_value = ExpressionWrapper(
+        F("quantity") * F("card_variant__current_value"),
+        output_field=DecimalField(max_digits=12, decimal_places=2),
+    )
+    rows = list(
+        queryset.values(
+            "card_variant__set_id",
+            "card_variant__set__name",
+            "card_variant__card__game__name",
+        )
+        .annotate(
+            record_count=Count("id"),
+            unit_count=Coalesce(Sum("quantity"), 0),
+            total_value=Coalesce(Sum(row_value), ZERO_MONEY),
+        )
+        .order_by("card_variant__card__game__name", "card_variant__set__name")
+    )
+    cover_cards = _inventory_cover_cards_by_set(user, params, [row["card_variant__set_id"] for row in rows])
+
+    return [
+        {
+            "set_name": row["card_variant__set__name"],
+            "game": row["card_variant__card__game__name"],
+            "cover_card": cover_cards.get(row["card_variant__set_id"]),
+            "record_count": row["record_count"],
+            "unit_count": row["unit_count"],
+            "total_value": row["total_value"],
+            "query": _query_with(params, view="card", set=row["card_variant__set__name"], page=None),
+            "is_active": params.get("set", "") == row["card_variant__set__name"],
+        }
+        for row in rows
+    ]
+
+
+def list_collection_game_summaries(user, params):
+    queryset = _filter_user_inventory_queryset(user, params).order_by()
+    row_value = ExpressionWrapper(
+        F("quantity") * F("card_variant__current_value"),
+        output_field=DecimalField(max_digits=12, decimal_places=2),
+    )
+    rows = list(
+        queryset.values("card_variant__card__game__name")
+        .annotate(
+            set_count=Count("card_variant__set_id", distinct=True),
+            record_count=Count("id"),
+            unit_count=Coalesce(Sum("quantity"), 0),
+            total_value=Coalesce(Sum(row_value), ZERO_MONEY),
+        )
+        .order_by("card_variant__card__game__name")
+    )
+    cover_cards = _inventory_cover_cards_by_game(user, params, [row["card_variant__card__game__name"] for row in rows])
+
+    return [
+        {
+            "game": row["card_variant__card__game__name"],
+            "cover_card": cover_cards.get(row["card_variant__card__game__name"]),
+            "set_count": row["set_count"],
+            "record_count": row["record_count"],
+            "unit_count": row["unit_count"],
+            "total_value": row["total_value"],
+            "query": _query_with(params, view="set", game=row["card_variant__card__game__name"], set=None, page=None),
+            "is_active": params.get("game", "") == row["card_variant__card__game__name"],
+        }
+        for row in rows
+    ]
 
 
 def list_my_inventory_for_variant(user, variant_id):
@@ -179,12 +284,57 @@ def _user_inventory_queryset(user):
         to_attr="active_frontend_listings",
     )
     return (
-        InventoryItem.objects.filter(owner=user)
-        .filter(quantity__gt=0)
+        _user_inventory_base_queryset(user)
         .select_related("card_variant__card__game", "card_variant__set", "card_variant__image")
         .prefetch_related(active_listing_prefetch)
         .order_by("card_variant__card__name", "condition")
     )
+
+
+def _user_inventory_base_queryset(user):
+    return InventoryItem.objects.filter(owner=user, quantity__gt=0)
+
+
+def _filter_user_inventory_queryset(user, params):
+    queryset = _user_inventory_queryset(user)
+    query = params.get("q", "").strip()
+    game = params.get("game", "")
+    set_name = params.get("set", "")
+    language = params.get("language", "")
+    selected_rarities = [rarity for rarity in _getlist(params, "rarity") if rarity]
+    selected_my_listings = params.get("my_listings", "")
+    min_price = params.get("min_price", "")
+    max_price = params.get("max_price", "")
+
+    if query:
+        queryset = (
+            queryset.annotate(search_rank=_inventory_search_rank(query))
+            .filter(search_rank__gt=SEARCH_SIMILARITY_THRESHOLD)
+            .order_by("-search_rank", "card_variant__card__name", "condition")
+        )
+    if game:
+        queryset = queryset.filter(card_variant__card__game__name=game)
+    if set_name:
+        queryset = queryset.filter(card_variant__set__name=set_name)
+    if language:
+        queryset = queryset.filter(card_variant__language=language)
+    if selected_rarities:
+        queryset = queryset.filter(card_variant__rarity__in=selected_rarities)
+    if min_price:
+        queryset = queryset.filter(card_variant__current_value__gte=min_price)
+    if max_price:
+        queryset = queryset.filter(card_variant__current_value__lte=max_price)
+    if selected_my_listings == "listed":
+        active_listing = MarketListing.objects.filter(
+            inventory_item=OuterRef("pk"),
+            status=MarketListing.Status.ACTIVE,
+            quantity_available__gt=0,
+        )
+        queryset = queryset.annotate(has_active_listing_filter=Exists(active_listing)).filter(
+            has_active_listing_filter=True
+        )
+
+    return queryset
 
 
 def _inventory_item_to_frontend(item):
@@ -235,6 +385,63 @@ def _inventory_item_to_frontend(item):
     else:
         data["listing_state"] = "unlisted"
     return data
+
+
+def _inventory_cover_cards_by_set(user, params, set_ids):
+    covers = {}
+    if not set_ids:
+        return covers
+    items = (
+        _filter_user_inventory_queryset(user, params)
+        .filter(card_variant__set_id__in=set_ids)
+        .order_by("card_variant__set_id", "card_variant__card__name", "id")
+        .distinct("card_variant__set_id")
+    )
+    for item in items:
+        covers.setdefault(item.card_variant.set_id, _inventory_item_to_frontend(item)["card"])
+    return covers
+
+
+def _inventory_cover_cards_by_game(user, params, games):
+    covers = {}
+    if not games:
+        return covers
+    items = (
+        _filter_user_inventory_queryset(user, params)
+        .filter(card_variant__card__game__name__in=games)
+        .order_by("card_variant__card__game__name", "card_variant__card__name", "id")
+        .distinct("card_variant__card__game__name")
+    )
+    for item in items:
+        covers.setdefault(item.card_variant.card.game.name, _inventory_item_to_frontend(item)["card"])
+    return covers
+
+
+def _inventory_search_rank(query):
+    return Greatest(
+        TrigramSimilarity("card_variant__card__name", query),
+        TrigramSimilarity("card_variant__card__card_type", query),
+        TrigramSimilarity("card_variant__card__subtype", query),
+        TrigramSimilarity("card_variant__collector_number", query),
+        TrigramSimilarity("card_variant__edition_label", query),
+    )
+
+
+def _getlist(params, name):
+    if hasattr(params, "getlist"):
+        return params.getlist(name)
+    value = params.get(name, [])
+    return value if isinstance(value, list) else [value]
+
+
+def _query_with(params, **updates):
+    query = params.copy()
+    for key, value in updates.items():
+        if value in (None, ""):
+            query.pop(key, None)
+        else:
+            query[key] = value
+    return query.urlencode()
 
 
 def _listing_queryset():

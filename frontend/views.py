@@ -13,6 +13,7 @@ from inventory.models import InventoryItem
 from frontend.services.album_service import (
     CARD_VIEW,
     SET_VIEW,
+    SHELF_VIEW,
     build_collection_album,
     build_record_browser,
     resolve_browser_view,
@@ -21,9 +22,13 @@ from frontend.services.backend_api import (
     add_inventory_item_for_user,
     buy_marketplace_listing,
     create_marketplace_listing_for_user,
+    get_inventory_summary,
     get_collection_value,
-    list_my_inventory_for_variant,
+    list_collection_game_summaries,
+    list_collection_set_summaries,
     list_my_inventory,
+    list_my_inventory_for_variant,
+    list_my_inventory_page,
 )
 from frontend.services.catalog_service import (
     build_price_history,
@@ -34,17 +39,21 @@ from frontend.services.catalog_service import (
     get_most_expensive_card_sold_this_month,
     list_active_listings_for_variant,
     list_card_page,
-    list_cards,
+    list_catalog_game_summaries,
+    list_catalog_set_summaries,
     list_similar_cards,
+    list_top_sold_cards_this_month,
+    normalize_catalog_filter_params,
 )
 from frontend.services.listing_service import (
     get_listing,
     list_listings,
 )
+from frontend.services.query_explainers import get_query_explainers
 
 
 def home(request):
-    featured_cards = list_cards({}, limit=6)
+    featured_cards = list_top_sold_cards_this_month(limit=6)
     monthly_top_sale = get_most_expensive_card_sold_this_month()
     showcase_card = monthly_top_sale or (featured_cards[0] if featured_cards else None)
     return render(
@@ -55,23 +64,41 @@ def home(request):
             "showcase_card": showcase_card,
             "showcase_is_sale": monthly_top_sale is not None,
             "latest_listings": list_listings({}, limit=6),
+            "query_explainers": get_query_explainers(
+                [
+                    "monthly_showcase",
+                    "latest_listings",
+                    "featured_cards",
+                ]
+            ),
         },
     )
 
 
 def catalog(request):
-    facets = get_card_facets()
-    card_page = list_card_page(request.GET)
-    browser_view = resolve_browser_view(request.GET, CARD_VIEW)
-    browser_records = card_page["results"] if browser_view == CARD_VIEW else list_cards(request.GET)
+    filter_params = normalize_catalog_filter_params(request.GET)
+    facets = get_card_facets(filter_params)
+    browser_view = resolve_browser_view(filter_params, CARD_VIEW)
+    card_page = list_card_page(filter_params) if browser_view == CARD_VIEW else _empty_page()
+    catalog_books = list_catalog_set_summaries(filter_params) if browser_view == SET_VIEW else []
+    catalog_shelves = list_catalog_game_summaries(filter_params) if browser_view == SHELF_VIEW else []
+    browser_records = card_page["results"] if browser_view == CARD_VIEW else []
+    browser_count = card_page["count"]
+    if browser_view == SET_VIEW:
+        browser_count = sum(book["record_count"] for book in catalog_books)
+    elif browser_view == SHELF_VIEW:
+        browser_count = sum(shelf["record_count"] for shelf in catalog_shelves)
     browser = build_record_browser(
         browser_records,
-        request.GET,
+        filter_params,
         mode="catalog",
         default_view=CARD_VIEW,
         external_pagination=card_page if browser_view == CARD_VIEW else None,
+        books=catalog_books,
+        shelves=catalog_shelves,
+        total_count=browser_count,
     )
-    pagination_query = request.GET.copy()
+    pagination_query = filter_params.copy()
     pagination_query.pop("page", None)
 
     return render(
@@ -79,7 +106,7 @@ def catalog(request):
         "catalog.html",
         {
             "cards": card_page["results"],
-            "result_count": card_page["count"],
+            "result_count": browser_count,
             "browser": browser,
             "pagination": card_page,
             "pagination_query": pagination_query.urlencode(),
@@ -88,8 +115,11 @@ def catalog(request):
             "sets": facets["sets"],
             "rarities": facets["rarities"],
             "languages": facets["languages"],
-            "selected_rarities": request.GET.getlist("rarity"),
-            "selected_available": request.GET.get("available") == "1",
+            "selected_game": filter_params.get("game", ""),
+            "selected_set": filter_params.get("set", ""),
+            "selected_rarities": filter_params.getlist("rarity"),
+            "selected_available": filter_params.get("available") == "1",
+            "query_explainers": get_query_explainers(["catalog_results"]),
         },
     )
 
@@ -159,6 +189,14 @@ def _render_card_detail(request, card):
             "listed_id": request.GET.get("listed"),
             "added_id": request.GET.get("added"),
             "add_error": request.GET.get("add_error"),
+            "query_explainers": get_query_explainers(
+                [
+                    "your_copies",
+                    "active_listings",
+                    "price_history",
+                    "similar_cards",
+                ]
+            ),
         },
     )
 
@@ -250,26 +288,36 @@ def collection(request):
                 else:
                     return redirect(f"{reverse('collection')}?listed={listing['id']}")
 
-    inventory_items = list_my_inventory(request.user)
     collection_value = get_collection_value(request.user)
-    facets = get_card_facets()
-    summary = {
-        "total_quantity": sum(item["quantity"] for item in inventory_items),
-        "available_quantity": sum(item["available_quantity"] for item in inventory_items),
-        "reserved_quantity": sum(item["reserved_quantity"] for item in inventory_items),
-    }
+    filter_params = normalize_catalog_filter_params(request.GET)
+    facets = get_card_facets(filter_params)
+    summary = get_inventory_summary(request.user)
+    browser_view = resolve_browser_view(filter_params, SET_VIEW)
+    collection_page = list_my_inventory_page(request.user, filter_params) if browser_view == CARD_VIEW else None
+    inventory_items = collection_page["results"] if collection_page else []
+    collection_books = list_collection_set_summaries(request.user, filter_params) if browser_view == SET_VIEW else []
+    collection_shelves = list_collection_game_summaries(request.user, filter_params) if browser_view == SHELF_VIEW else []
+    browser_count = collection_page["count"] if collection_page else 0
+    if browser_view == SET_VIEW:
+        browser_count = sum(book["record_count"] for book in collection_books)
+    elif browser_view == SHELF_VIEW:
+        browser_count = sum(shelf["record_count"] for shelf in collection_shelves)
 
     return render(
         request,
         "collection.html",
         {
             "inventory_items": inventory_items,
-            "album": build_collection_album(inventory_items, request.GET),
+            "album": build_collection_album(inventory_items, filter_params),
             "browser": build_record_browser(
                 inventory_items,
-                request.GET,
+                filter_params,
                 mode="collection",
                 default_view=SET_VIEW,
+                external_pagination=collection_page if browser_view == CARD_VIEW else None,
+                books=collection_books,
+                shelves=collection_shelves,
+                total_count=browser_count,
             ),
             "collection_value": collection_value,
             "summary": summary,
@@ -277,9 +325,17 @@ def collection(request):
             "sets": facets["sets"],
             "rarities": facets["rarities"],
             "languages": facets["languages"],
-            "selected_rarities": request.GET.getlist("rarity"),
+            "selected_game": filter_params.get("game", ""),
+            "selected_set": filter_params.get("set", ""),
+            "selected_rarities": filter_params.getlist("rarity"),
             "error": error,
             "listed_id": request.GET.get("listed"),
+            "query_explainers": get_query_explainers(
+                [
+                    "collection_summary",
+                    "collection_browser",
+                ]
+            ),
         },
     )
 
@@ -324,6 +380,7 @@ def listing_detail(request, listing_id):
         {
             "listing": listing,
             "error": error,
+            "query_explainers": get_query_explainers(["listing_detail"]),
         },
     )
 
@@ -362,3 +419,17 @@ def login_view(request):
 def _optional_decimal(value):
     value = value.strip() if value else ""
     return Decimal(value) if value else None
+
+
+def _empty_page():
+    return {
+        "results": [],
+        "count": 0,
+        "page": 1,
+        "page_size": 0,
+        "num_pages": 1,
+        "has_previous": False,
+        "has_next": False,
+        "previous_page_number": None,
+        "next_page_number": None,
+    }

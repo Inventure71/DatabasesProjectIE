@@ -37,6 +37,11 @@ class InventoryItem(TimeStampedModel):
         ordering = ("owner_id", "card_variant_id", "condition")
         indexes = [
             models.Index(fields=("owner", "card_variant"), name="inventory_owner_variant_idx"),
+            models.Index(
+                fields=("owner", "card_variant", "condition"),
+                name="inventory_active_owner_idx",
+                condition=models.Q(quantity__gt=0),
+            ),
         ]
         constraints = [
             models.UniqueConstraint(

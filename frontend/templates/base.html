@@ -5,7 +5,12 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>{% block title %}Card Marketplace{% endblock %}</title>
+    <title>{% block title %}TCGNET{% endblock %}</title>
+    <link rel="icon" href="{% static 'icons/favicon.ico' %}" sizes="any">
+    <link rel="icon" type="image/png" sizes="32x32" href="{% static 'icons/favicon-32x32.png' %}">
+    <link rel="icon" type="image/png" sizes="16x16" href="{% static 'icons/favicon-16x16.png' %}">
+    <link rel="apple-touch-icon" sizes="180x180" href="{% static 'icons/apple-touch-icon.png' %}">
+    <link rel="manifest" href="{% static 'icons/site.webmanifest' %}">
     <link rel="stylesheet" href="{% static 'css/styles.css' %}">
 </head>
 <body>
@@ -17,6 +22,35 @@
     </main>
 
     <script src="{% static 'js/kinetic-card.js' %}" defer></script>
+    <script>
+        document.addEventListener("DOMContentLoaded", function () {
+            document.querySelectorAll("[data-query-help-open]").forEach(function (button) {
+                button.addEventListener("click", function () {
+                    var dialog = document.getElementById(button.dataset.queryHelpOpen);
+                    if (!dialog) {
+                        return;
+                    }
+                    if (typeof dialog.showModal === "function") {
+                        dialog.showModal();
+                    } else {
+                        dialog.setAttribute("open", "");
+                    }
+                });
+            });
+
+            document.querySelectorAll(".query-help-modal").forEach(function (dialog) {
+                dialog.addEventListener("click", function (event) {
+                    if (event.target === dialog) {
+                        if (typeof dialog.close === "function") {
+                            dialog.close();
+                        } else {
+                            dialog.removeAttribute("open");
+                        }
+                    }
+                });
+            });
+        });
+    </script>
     {% block scripts %}{% endblock %}
 </body>
 </html>

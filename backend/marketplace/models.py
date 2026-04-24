@@ -37,6 +37,16 @@ class MarketListing(TimeStampedModel):
             models.Index(fields=("seller", "status"), name="listing_seller_status_idx"),
             models.Index(fields=("status", "unit_price"), name="listing_status_price_idx"),
             models.Index(fields=("inventory_item", "status"), name="listing_inventory_status_idx"),
+            models.Index(
+                fields=("-created_at", "id"),
+                name="listing_active_new_idx",
+                condition=models.Q(status="ACTIVE", quantity_available__gt=0),
+            ),
+            models.Index(
+                fields=("inventory_item",),
+                name="listing_active_inventory_idx",
+                condition=models.Q(status="ACTIVE", quantity_available__gt=0),
+            ),
         ]
         constraints = [
             models.CheckConstraint(condition=models.Q(quantity__gt=0), name="listing_quantity_positive"),

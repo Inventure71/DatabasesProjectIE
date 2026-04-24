@@ -59,6 +59,7 @@ Current status:
 - [x] Confirmed similarity is optional later work and not part of the first transactional marketplace slice
 - [x] Inventory uses an aggregate stock rule: one row per owner, card variant, and condition; duplicate additions increase quantity on that row.
 - [x] Listing creation reserves quantity from aggregate inventory, and purchase/cancel flows update reserved stock transactionally.
+- [x] Added PostgreSQL-focused query support: `pg_trgm` catalog search indexes, partial active-listing indexes, partial active-inventory index, and descending price-history index.
 
 ## Phase 1: Backend Foundation
 
@@ -123,6 +124,7 @@ Current status:
 - [x] Verified from user run output that the Django development server starts on `http://127.0.0.1:8000/`
 - [x] Verified on 2026-04-20 that `backend/README.md` documents setup, database creation, checks, migrations, and local server startup
 - [x] Updated setup docs on 2026-04-23 to explain the PostgreSQL role/user password, `cards_marketplace` database ownership, direct `psql` credential check, and local run/test commands.
+- [x] Added PostgreSQL-specific migrations for trigram search and query-pattern indexes; no `EXPLAIN ANALYZE` documentation was added because that was explicitly excluded from this implementation pass.
 
 ## Phase 2: Shared Backend Conventions
 
@@ -284,6 +286,10 @@ Current status:
 - [x] Added `python manage.py import_pokemon_cards_dataset --all-source-sets` for a fuller dataset import path.
 - [x] Documented that all-set mode infers unknown set codes and collector denominators from the CSV, while the default import keeps the curated Base/Jungle MVP scope.
 - [x] Verified the current `pokemon-cards.csv` can be parsed for all-set mode: 13,139 rows, 147 source sets, and 0 unparseable id suffixes.
+- [x] Optimized `import_pokemon_cards_dataset --all-source-sets` on 2026-04-23 to use batched set/card/variant/image upserts instead of per-row ORM `update_or_create` calls, making remote PostgreSQL imports practical.
+- [x] Added a regression test proving the all-set importer uses bounded batched database writes for repeated card names.
+- [x] Fixed duplicate import rows resolving to the same `CardVariant` so image bulk upsert creates or updates only one `CardImage` per variant, preserving one-to-one idempotency.
+- [x] Verified on 2026-04-24 that `python manage.py test catalog --keepdb` passes after the duplicate-row image upsert fix.
 
 ## Phase 5: Catalog Read API
 

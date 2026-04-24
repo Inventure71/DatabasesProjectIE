@@ -14,6 +14,7 @@ from inventory.models import InventoryItem
 from inventory.services import add_inventory_item
 from marketplace.models import MarketListing, PurchaseOrder
 from marketplace.services import create_listing, purchase_listing
+from pricing.models import PriceSnapshot
 from pricing.services import record_price_snapshot
 
 
@@ -152,6 +153,41 @@ class FrontendBackendApiWiringTests(TestCase):
         self.assertIsNone(options["Shelf"].get("game"))
         self.assertEqual(options["Shelf"].get("set"), "Backend Set")
 
+    def test_catalog_set_filter_requires_selected_game(self):
+        other_game = CardGame.objects.create(name="Other TCG", slug="other-tcg")
+        other_set = CardSet.objects.create(game=other_game, name="Other Set", code="OTHER")
+        other_card = Card.objects.create(game=other_game, name="Other Dragon")
+        CardVariant.objects.create(card=other_card, set=other_set, collector_number="1/10")
+
+        default_response = self.client.get(reverse("catalog"))
+        selected_game_response = self.client.get(reverse("catalog"), {"game": "Backend TCG"})
+
+        self.assertEqual(default_response.status_code, 200)
+        self.assertEqual(default_response.context["sets"], [])
+        self.assertContains(default_response, "Choose a game first")
+
+        self.assertEqual(selected_game_response.status_code, 200)
+        self.assertEqual(selected_game_response.context["sets"], ["Backend Set"])
+        self.assertContains(selected_game_response, "Backend Set")
+        self.assertNotIn("Other Set", selected_game_response.context["sets"])
+
+    def test_catalog_ignores_stale_set_filter_from_another_game(self):
+        other_game = CardGame.objects.create(name="Other TCG", slug="other-tcg")
+        CardSet.objects.create(game=other_game, name="Other Set", code="OTHER")
+
+        response = self.client.get(
+            reverse("catalog"),
+            {
+                "game": "Backend TCG",
+                "set": "Other Set",
+            },
+        )
+
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, "Backend Dragon")
+        self.assertEqual(response.context["sets"], ["Backend Set"])
+        self.assertNotIn("Other Set", response.context["sets"])
+
     def test_sidebar_search_inputs_switch_shared_browser_forms_to_card_view(self):
         self.client.force_login(self.seller)
         responses = [
@@ -207,6 +243,71 @@ class FrontendBackendApiWiringTests(TestCase):
             "Expected the catalog query to apply the page size in SQL.",
         )
 
+    def test_catalog_search_uses_postgresql_trigram_similarity(self):
+        with CaptureQueriesContext(connection) as queries:
+            response = self.client.get(reverse("catalog"), {"q": "Backend Dragon"})
+
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, "Backend Dragon")
+        sql = "\n".join(query["sql"] for query in queries.captured_queries).upper()
+        self.assertIn("SIMILARITY(", sql)
+        self.assertNotIn("LIKE", sql)
+
+    def test_catalog_set_browser_uses_database_grouping_for_book_summaries(self):
+        extra_card = Card.objects.create(game=self.game, name="Backend Phoenix")
+        CardVariant.objects.create(
+            card=extra_card,
+            set=self.card_set,
+            collector_number="2/99",
+            current_value=Decimal("11.00"),
+        )
+
+        with CaptureQueriesContext(connection) as queries:
+            response = self.client.get(reverse("catalog"), {"view": "set"})
+
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, "Backend Set")
+        self.assertTrue(
+            any(
+                "GROUP BY" in query["sql"].upper() and "CARD_VARIANT" in query["sql"].upper()
+                for query in queries.captured_queries
+            ),
+            "Expected catalog set summaries to be grouped by the database.",
+        )
+
+    def test_catalog_set_browser_does_not_run_unused_card_page_query(self):
+        with CaptureQueriesContext(connection) as queries:
+            response = self.client.get(reverse("catalog"), {"view": "set"})
+
+        self.assertEqual(response.status_code, 200)
+        self.assertFalse(
+            any(
+                "CARD_VARIANT" in query["sql"].upper()
+                and "LIMIT 24" in query["sql"].upper()
+                for query in queries.captured_queries
+            ),
+            "Expected set view to avoid the card-page LIMIT query it does not render.",
+        )
+
+    def test_catalog_set_browser_selects_cover_cards_with_postgresql_distinct_on(self):
+        other_set = CardSet.objects.create(game=self.game, name="Backend Other Set", code="BACK2")
+        other_card = Card.objects.create(game=self.game, name="Backend Other Dragon")
+        CardVariant.objects.create(
+            card=other_card,
+            set=other_set,
+            collector_number="2/99",
+            current_value=Decimal("11.00"),
+        )
+
+        with CaptureQueriesContext(connection) as queries:
+            response = self.client.get(reverse("catalog"), {"view": "set"})
+
+        self.assertEqual(response.status_code, 200)
+        self.assertTrue(
+            any("DISTINCT ON" in query["sql"].upper() for query in queries.captured_queries),
+            "Expected PostgreSQL DISTINCT ON to select one cover card per set.",
+        )
+
     def test_home_search_form_submits_to_catalog_search(self):
         response = self.client.get(reverse("home"))
 
@@ -225,6 +326,41 @@ class FrontendBackendApiWiringTests(TestCase):
         ]
         self.assertGreaterEqual(len(limited_queries), 2)
 
+    def test_home_featured_cards_fill_missing_sale_slots_from_catalog(self):
+        fallback_card_names = []
+        for index in range(1, 7):
+            card = Card.objects.create(game=self.game, name=f"Fallback Feature {index:02d}")
+            fallback_card_names.append(card.name)
+            CardVariant.objects.create(
+                card=card,
+                set=self.card_set,
+                collector_number=f"F{index}/99",
+                rarity=CardVariant.Rarity.COMMON,
+                current_value=Decimal(index),
+            )
+
+        purchase_listing(buyer=self.buyer, listing=self.listing, quantity=1)
+
+        with CaptureQueriesContext(connection) as queries:
+            response = self.client.get(reverse("home"))
+
+        self.assertEqual(response.status_code, 200)
+        featured_names = [card["name"] for card in response.context["featured_cards"]]
+        self.assertEqual(len(featured_names), 6)
+        self.assertEqual(featured_names[0], "Backend Dragon")
+        self.assertEqual(len(featured_names), len(set(featured_names)))
+        self.assertTrue(any(name in featured_names for name in fallback_card_names))
+        self.assertTrue(
+            any(
+                "CARD_VARIANT" in query["sql"].upper()
+                and "NOT" in query["sql"].upper()
+                and " IN " in query["sql"].upper()
+                and "LIMIT 5" in query["sql"].upper()
+                for query in queries
+            ),
+            "Expected fallback featured cards to exclude sold variants and limit missing slots in SQL.",
+        )
+
     def test_home_page_prioritizes_latest_listings_above_featured_cards(self):
         response = self.client.get(reverse("home"))
 
@@ -232,6 +368,39 @@ class FrontendBackendApiWiringTests(TestCase):
         content = response.content.decode()
         self.assertLess(content.index("Latest Listings"), content.index("Featured Cards"))
         self.assertContains(response, f'href="{reverse("catalog")}?available=1#browser"')
+
+    def test_database_query_explainers_render_on_backend_backed_pages(self):
+        self.client.force_login(self.seller)
+
+        responses = [
+            self.client.get(reverse("home")),
+            self.client.get(reverse("catalog"), {"q": "Backend Dragon", "available": "1"}),
+            self.client.get(reverse("card_variant_detail", kwargs={"variant_id": self.variant.pk})),
+            self.client.get(reverse("collection"), {"view": "card"}),
+            self.client.get(reverse("listing_detail", kwargs={"listing_id": self.listing.pk})),
+        ]
+
+        for response in responses:
+            self.assertEqual(response.status_code, 200)
+            self.assertContains(response, 'data-query-help-open')
+            self.assertContains(response, "Database query walkthrough")
+
+        self.assertContains(responses[0], "Latest listings query")
+        self.assertContains(responses[0], "Featured cards query")
+        self.assertContains(responses[1], "Catalog browser query")
+        self.assertContains(responses[2], "Your copies query")
+        self.assertContains(responses[2], "Card active listings query")
+        self.assertContains(responses[2], "Price history query")
+        self.assertContains(responses[2], "Similar cards query")
+        self.assertContains(responses[3], "Collection summary query")
+        self.assertContains(responses[3], "Owned inventory browser query")
+        self.assertContains(responses[4], "Listing detail query")
+
+    def test_query_explainer_javascript_is_loaded_inline(self):
+        response = self.client.get(reverse("home"))
+
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, "queryHelpOpen")
 
     def test_home_page_showcases_most_expensive_card_sold_this_month(self):
         old_expensive_sale = purchase_listing(
@@ -468,7 +637,7 @@ class FrontendBackendApiWiringTests(TestCase):
         )
         self.client.force_login(self.seller)
 
-        response = self.client.get(reverse("collection"), {"view": "card", "set": "Jungle"})
+        response = self.client.get(reverse("collection"), {"view": "card", "game": "Backend TCG", "set": "Jungle"})
         default_response = self.client.get(reverse("collection"))
 
         self.assertEqual(response.status_code, 200)
@@ -600,7 +769,7 @@ class FrontendBackendApiWiringTests(TestCase):
 
         response = self.client.get(
             reverse("collection"),
-            {"view": "card", "set": "Jungle", "my_listings": "listed"},
+            {"view": "card", "game": "Backend TCG", "set": "Jungle", "my_listings": "listed"},
         )
         default_response = self.client.get(reverse("collection"), {"view": "card", "my_listings": "listed"})
 
@@ -618,6 +787,82 @@ class FrontendBackendApiWiringTests(TestCase):
         self.assertContains(default_response, 'class="browser-view-toggle"')
         self.assertContains(default_response, "album-card-grid")
 
+    def test_collection_summary_uses_database_aggregation(self):
+        self.client.force_login(self.seller)
+
+        with CaptureQueriesContext(connection) as queries:
+            response = self.client.get(reverse("collection"), {"view": "card"})
+
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.context["summary"]["total_quantity"], 3)
+        self.assertTrue(
+            any(
+                "SUM(" in query["sql"].upper()
+                and "RESERVED_QUANTITY" in query["sql"].upper()
+                and "INVENTORY_ITEM" in query["sql"].upper()
+                for query in queries.captured_queries
+            ),
+            "Expected collection totals to be computed with SQL aggregates.",
+        )
+
+    def test_collection_card_browser_limits_owned_inventory_in_database(self):
+        for index in range(1, 15):
+            card = Card.objects.create(game=self.game, name=f"Owned Page {index:02d}")
+            variant = CardVariant.objects.create(
+                card=card,
+                set=self.card_set,
+                collector_number=f"{index + 10}/99",
+                current_value=Decimal("2.00"),
+            )
+            add_inventory_item(
+                owner=self.seller,
+                card_variant=variant,
+                condition=InventoryItem.Condition.NEAR_MINT,
+                quantity=1,
+                actor=self.seller,
+            )
+        self.client.force_login(self.seller)
+
+        with CaptureQueriesContext(connection) as queries:
+            response = self.client.get(reverse("collection"), {"view": "card"})
+
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, "Album Page")
+        self.assertTrue(
+            any(
+                "INVENTORY_ITEM" in query["sql"].upper() and "LIMIT 12" in query["sql"].upper()
+                for query in queries.captured_queries
+            ),
+            "Expected collection card browsing to apply the visible page limit in SQL.",
+        )
+
+    def test_collection_set_browser_selects_cover_cards_with_postgresql_distinct_on(self):
+        other_set = CardSet.objects.create(game=self.game, name="Owned Other Set", code="OWN2")
+        other_card = Card.objects.create(game=self.game, name="Owned Other Dragon")
+        other_variant = CardVariant.objects.create(
+            card=other_card,
+            set=other_set,
+            collector_number="2/99",
+            current_value=Decimal("11.00"),
+        )
+        add_inventory_item(
+            owner=self.seller,
+            card_variant=other_variant,
+            condition=InventoryItem.Condition.NEAR_MINT,
+            quantity=1,
+            actor=self.seller,
+        )
+        self.client.force_login(self.seller)
+
+        with CaptureQueriesContext(connection) as queries:
+            response = self.client.get(reverse("collection"), {"view": "set"})
+
+        self.assertEqual(response.status_code, 200)
+        self.assertTrue(
+            any("DISTINCT ON" in query["sql"].upper() for query in queries.captured_queries),
+            "Expected PostgreSQL DISTINCT ON to select one collection cover card per set.",
+        )
+
     def test_card_detail_uses_real_backend_price_history_and_listings(self):
         response = self.client.get(reverse("card_detail", kwargs={"card_id": self.card.pk}))
 
@@ -625,6 +870,29 @@ class FrontendBackendApiWiringTests(TestCase):
         self.assertContains(response, "Backend Dragon")
         self.assertContains(response, "frontend-test")
         self.assertContains(response, "frontend-seller")
+
+    def test_card_detail_limits_price_history_in_database(self):
+        for index in range(30):
+            PriceSnapshot.objects.create(
+                card_variant=self.variant,
+                price=Decimal("1.00") + Decimal(index),
+                source_name=f"history-{index}",
+                captured_at=timezone.now() - timezone.timedelta(days=index + 1),
+            )
+
+        with CaptureQueriesContext(connection) as queries:
+            response = self.client.get(reverse("card_variant_detail", kwargs={"variant_id": self.variant.pk}))
+
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, "history-0")
+        self.assertNotContains(response, "history-29")
+        self.assertTrue(
+            any(
+                "PRICE_SNAPSHOT" in query["sql"].upper() and "LIMIT 24" in query["sql"].upper()
+                for query in queries.captured_queries
+            ),
+            "Expected price history to apply the display limit in SQL.",
+        )
 
     def test_variant_detail_uses_requested_variant(self):
         second_variant = CardVariant.objects.create(

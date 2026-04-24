@@ -7,7 +7,9 @@ from django.contrib import admin
 from django.core.exceptions import ValidationError
 from django.core.management import call_command, CommandError
 from django.db import IntegrityError, models, transaction
+from django.db import connection
 from django.test import TestCase
+from django.test.utils import CaptureQueriesContext
 from django.urls import reverse
 from rest_framework import status
 from rest_framework.test import APITestCase
@@ -104,8 +106,61 @@ class CatalogModelTests(TestCase):
         self.assertIsInstance(CardVariant._meta.get_field("set"), models.ForeignKey)
         self.assertIsInstance(CardImage._meta.get_field("card_variant"), models.OneToOneField)
 
+    def test_postgresql_search_indexes_match_catalog_search_fields(self):
+        card_indexes = {index.name for index in Card._meta.indexes}
+        variant_indexes = {index.name for index in CardVariant._meta.indexes}
+
+        self.assertTrue(
+            {
+                "card_name_trgm_idx",
+                "card_type_trgm_idx",
+                "card_subtype_trgm_idx",
+                "card_artist_trgm_idx",
+            }.issubset(card_indexes)
+        )
+        self.assertTrue(
+            {
+                "variant_collector_trgm_idx",
+                "variant_edition_trgm_idx",
+            }.issubset(variant_indexes)
+        )
+
 
 class ImportPokemonCardsDatasetCommandTests(TestCase):
+    def test_duplicate_import_rows_create_one_image_per_variant(self):
+        with TemporaryDirectory() as directory:
+            csv_path = Path(directory) / "pokemon-cards.csv"
+            csv_path.write_text(
+                "\n".join(
+                    [
+                        "id,image_url,caption,name,hp,set_name",
+                        (
+                            "base1-4,https://example.com/charizard-old.png,"
+                            "\"A Stage 2 Pokemon Card of type Fire with the title Charizard and 120 HP "
+                            "of rarity Rare Holo evolved from Charmeleon from the set Base.\","
+                            "Charizard,120,Base"
+                        ),
+                        (
+                            "base1-4,https://example.com/charizard-new.png,"
+                            "\"A Stage 2 Pokemon Card of type Fire with the title Charizard and 120 HP "
+                            "of rarity Rare Holo evolved from Charmeleon from the set Base.\","
+                            "Charizard,120,Base"
+                        ),
+                    ]
+                ),
+                encoding="utf-8",
+            )
+            output = StringIO()
+
+            call_command("import_pokemon_cards_dataset", str(csv_path), stdout=output)
+
+        self.assertEqual(CardVariant.objects.count(), 1)
+        self.assertEqual(CardImage.objects.count(), 1)
+        self.assertEqual(
+            CardVariant.objects.get(card__name="Charizard").image.image_url,
+            "https://example.com/charizard-new.png",
+        )
+
     def test_imports_default_sets_repeatably_without_duplicates(self):
         with TemporaryDirectory() as directory:
             csv_path = Path(directory) / "pokemon-cards.csv"
@@ -275,6 +330,30 @@ class ImportPokemonCardsDatasetCommandTests(TestCase):
             "153/153",
         )
         self.assertIn("Skipped 0 row(s)", output.getvalue())
+
+    def test_all_source_sets_import_uses_batched_database_writes(self):
+        with TemporaryDirectory() as directory:
+            csv_path = Path(directory) / "pokemon-cards.csv"
+            rows = ["id,image_url,caption,name,hp,set_name"]
+            for index in range(1, 21):
+                rows.append(
+                    (
+                        f"bulk1-{index},https://example.com/pikachu-{index}.png,"
+                        "\"A Basic Pokemon Card of type Lightning with the title Pikachu and 60 HP "
+                        "of rarity Common from the set Bulk Set.\","
+                        "Pikachu,60,Bulk Set"
+                    )
+                )
+            csv_path.write_text("\n".join(rows), encoding="utf-8")
+
+            output = StringIO()
+            with CaptureQueriesContext(connection) as queries:
+                call_command("import_pokemon_cards_dataset", str(csv_path), "--all-source-sets", stdout=output)
+
+        self.assertEqual(Card.objects.count(), 1)
+        self.assertEqual(CardVariant.objects.count(), 20)
+        self.assertEqual(CardImage.objects.count(), 20)
+        self.assertLessEqual(len(queries), 35)
 
     def test_all_source_sets_cannot_be_combined_with_specific_set_filters(self):
         with TemporaryDirectory() as directory:

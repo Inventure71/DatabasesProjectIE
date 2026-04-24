@@ -6,6 +6,7 @@ from pathlib import Path
 
 from django.core.management.base import BaseCommand, CommandError
 from django.db import transaction
+from django.utils import timezone
 
 from catalog.models import Card, CardGame, CardImage, CardSet, CardVariant
 
@@ -60,6 +61,7 @@ class Command(BaseCommand):
             selected_source_set_names=options["source_set_name"],
             import_all_source_sets=options["all_source_sets"],
         )
+        import_rows, skipped_count = _prepare_import_rows(rows=rows, import_sets=import_sets)
 
         with transaction.atomic():
             game, _ = CardGame.objects.update_or_create(
@@ -69,34 +71,18 @@ class Command(BaseCommand):
                     "description": "Pokemon trading card game.",
                 },
             )
-            card_sets = {
-                source_set_name: self._upsert_card_set(
-                    game=game,
-                    source_set_name=source_set_name,
-                    set_config=set_config,
-                )
-                for source_set_name, set_config in import_sets.items()
-            }
-
-            imported_count = 0
-            skipped_count = 0
-
-            for row in rows:
-                if row["set_name"] not in card_sets:
-                    skipped_count += 1
-                    continue
-
-                self._import_row(
-                    game=game,
-                    card_set=card_sets[row["set_name"]],
-                    row=row,
-                    collector_total=import_sets[row["set_name"]]["collector_total"],
-                )
-                imported_count += 1
+            card_sets = self._bulk_upsert_card_sets(game=game, import_sets=import_sets)
+            cards = self._bulk_upsert_cards(game=game, import_rows=import_rows)
+            variants = self._bulk_upsert_variants(
+                cards=cards,
+                card_sets=card_sets,
+                import_rows=import_rows,
+            )
+            self._bulk_upsert_images(variants=variants, import_rows=import_rows)
 
         self.stdout.write(
             self.style.SUCCESS(
-                f"Imported {imported_count} card variant(s) from {', '.join(import_sets)}. "
+                f"Imported {len(import_rows)} card variant(s) from {', '.join(import_sets)}. "
                 f"Skipped {skipped_count} row(s)."
             )
         )
@@ -107,17 +93,6 @@ class Command(BaseCommand):
             self._validate_columns(reader.fieldnames)
             return list(reader)
 
-    def _upsert_card_set(self, *, game, source_set_name, set_config):
-        card_set, _ = CardSet.objects.update_or_create(
-            game=game,
-            code=set_config["set_code"],
-            defaults={
-                "name": set_config["set_name"],
-                "description": f"Imported Pokemon TCG {set_config['set_name']} cards.",
-            },
-        )
-        return card_set
-
     def _validate_columns(self, fieldnames):
         required_columns = {"id", "image_url", "caption", "name", "hp", "set_name"}
         missing_columns = required_columns - set(fieldnames or [])
@@ -125,40 +100,277 @@ class Command(BaseCommand):
             missing = ", ".join(sorted(missing_columns))
             raise CommandError(f"CSV is missing required column(s): {missing}")
 
-    def _import_row(self, *, game, card_set, row, collector_total):
+    def _bulk_upsert_card_sets(self, *, game, import_sets):
+        now = timezone.now()
+        set_codes = [set_config["set_code"] for set_config in import_sets.values()]
+        existing_by_code = {
+            card_set.code: card_set
+            for card_set in CardSet.objects.filter(game=game, code__in=set_codes)
+        }
+
+        card_sets_to_create = []
+        card_sets_to_update = []
+        for set_config in import_sets.values():
+            defaults = {
+                "name": set_config["set_name"],
+                "description": f"Imported Pokemon TCG {set_config['set_name']} cards.",
+            }
+            card_set = existing_by_code.get(set_config["set_code"])
+            if card_set:
+                card_set.name = defaults["name"]
+                card_set.description = defaults["description"]
+                card_set.updated_at = now
+                card_sets_to_update.append(card_set)
+            else:
+                card_sets_to_create.append(
+                    CardSet(
+                        game=game,
+                        code=set_config["set_code"],
+                        **defaults,
+                    )
+                )
+
+        if card_sets_to_create:
+            CardSet.objects.bulk_create(card_sets_to_create, batch_size=1000)
+        if card_sets_to_update:
+            CardSet.objects.bulk_update(
+                card_sets_to_update,
+                ["name", "description", "updated_at"],
+                batch_size=1000,
+            )
+
+        card_sets_by_code = {
+            card_set.code: card_set
+            for card_set in CardSet.objects.filter(game=game, code__in=set_codes)
+        }
+        return {
+            source_set_name: card_sets_by_code[set_config["set_code"]]
+            for source_set_name, set_config in import_sets.items()
+        }
+
+    def _bulk_upsert_cards(self, *, game, import_rows):
+        latest_by_name = {}
+        for import_row in import_rows:
+            latest_by_name[import_row["name"]] = import_row
+
+        names = list(latest_by_name)
+        existing_by_name = {
+            card.name: card
+            for card in Card.objects.filter(game=game, name__in=names)
+        }
+        cards_to_create = []
+        for name, import_row in latest_by_name.items():
+            if name in existing_by_name:
+                continue
+            cards_to_create.append(
+                Card(
+                    game=game,
+                    name=name,
+                    card_type="Pokemon",
+                    subtype=import_row["subtype"],
+                    description=import_row["caption"],
+                    hp=import_row["hp"],
+                )
+            )
+
+        if cards_to_create:
+            Card.objects.bulk_create(cards_to_create, batch_size=1000)
+
+        cards_by_name = {
+            card.name: card
+            for card in Card.objects.filter(game=game, name__in=names)
+        }
+        now = timezone.now()
+        cards_to_update = []
+        for name, import_row in latest_by_name.items():
+            card = cards_by_name[name]
+            card.card_type = "Pokemon"
+            card.subtype = import_row["subtype"]
+            card.description = import_row["caption"]
+            card.hp = import_row["hp"]
+            card.updated_at = now
+            cards_to_update.append(card)
+
+        if cards_to_update:
+            Card.objects.bulk_update(
+                cards_to_update,
+                ["card_type", "subtype", "description", "hp", "updated_at"],
+                batch_size=1000,
+            )
+        return cards_by_name
+
+    def _bulk_upsert_variants(self, *, cards, card_sets, import_rows):
+        existing_variants = CardVariant.objects.filter(
+            card_id__in=[card.id for card in cards.values()],
+            set_id__in=[card_set.id for card_set in card_sets.values()],
+        )
+        existing_by_key = {
+            _variant_key_from_object(variant): variant
+            for variant in existing_variants
+        }
+
+        desired_by_key = {}
+        for import_row in import_rows:
+            card = cards[import_row["name"]]
+            card_set = card_sets[import_row["source_set_name"]]
+            key = _variant_key(
+                card_id=card.id,
+                set_id=card_set.id,
+                collector_number=import_row["collector_number"],
+                finish=import_row["finish"],
+                language="en",
+                edition_label="",
+                is_first_edition=False,
+            )
+            import_row["variant_key"] = key
+            desired_by_key[key] = {
+                "card": card,
+                "card_set": card_set,
+                "import_row": import_row,
+            }
+
+        variants_to_create = []
+        variants_to_update = []
+        now = timezone.now()
+        for key, desired in desired_by_key.items():
+            import_row = desired["import_row"]
+            variant = existing_by_key.get(key)
+            if variant:
+                variant.rarity = import_row["rarity"]
+                variant.current_value = Decimal("0.00")
+                variant.updated_at = now
+                variants_to_update.append(variant)
+            else:
+                variants_to_create.append(
+                    CardVariant(
+                        card=desired["card"],
+                        set=desired["card_set"],
+                        collector_number=import_row["collector_number"],
+                        rarity=import_row["rarity"],
+                        finish=import_row["finish"],
+                        language="en",
+                        edition_label="",
+                        is_first_edition=False,
+                        current_value=Decimal("0.00"),
+                    )
+                )
+
+        if variants_to_create:
+            CardVariant.objects.bulk_create(variants_to_create, batch_size=1000)
+        if variants_to_update:
+            CardVariant.objects.bulk_update(
+                variants_to_update,
+                ["rarity", "current_value", "updated_at"],
+                batch_size=1000,
+            )
+
+        all_variants = CardVariant.objects.filter(
+            card_id__in=[card.id for card in cards.values()],
+            set_id__in=[card_set.id for card_set in card_sets.values()],
+        )
+        return {
+            _variant_key_from_object(variant): variant
+            for variant in all_variants
+        }
+
+    def _bulk_upsert_images(self, *, variants, import_rows):
+        desired_by_variant_id = {}
+        for import_row in import_rows:
+            variant = variants[import_row["variant_key"]]
+            desired_by_variant_id[variant.id] = {
+                "variant": variant,
+                "image_url": import_row["image_url"],
+            }
+
+        existing_images_by_variant_id = {
+            image.card_variant_id: image
+            for image in CardImage.objects.filter(card_variant_id__in=desired_by_variant_id)
+        }
+
+        images_to_create = []
+        images_to_update = []
+        now = timezone.now()
+        for variant_id, desired in desired_by_variant_id.items():
+            image = existing_images_by_variant_id.get(variant_id)
+            if image:
+                image.image_url = desired["image_url"]
+                image.image_hash = ""
+                image.width = None
+                image.height = None
+                image.updated_at = now
+                images_to_update.append(image)
+            else:
+                images_to_create.append(
+                    CardImage(
+                        card_variant=desired["variant"],
+                        image_url=desired["image_url"],
+                        image_hash="",
+                        width=None,
+                        height=None,
+                    )
+                )
+
+        if images_to_create:
+            CardImage.objects.bulk_create(images_to_create, batch_size=1000)
+        if images_to_update:
+            CardImage.objects.bulk_update(
+                images_to_update,
+                ["image_url", "image_hash", "width", "height", "updated_at"],
+                batch_size=1000,
+            )
+
+
+def _prepare_import_rows(*, rows, import_sets):
+    import_rows = []
+    skipped_count = 0
+    for row in rows:
+        source_set_name = row["set_name"]
+        if source_set_name not in import_sets:
+            skipped_count += 1
+            continue
+
         metadata = _parse_caption(row["caption"])
-        card, _ = Card.objects.update_or_create(
-            game=game,
-            name=row["name"],
-            defaults={
-                "card_type": "Pokemon",
-                "subtype": metadata["subtype"],
-                "description": row["caption"],
-                "hp": _parse_int(row["hp"]),
-            },
+        collector_number = _collector_number(
+            row["id"],
+            collector_total=import_sets[source_set_name]["collector_total"],
         )
-        variant, _ = CardVariant.objects.update_or_create(
-            card=card,
-            set=card_set,
-            collector_number=_collector_number(row["id"], collector_total=collector_total),
-            finish=metadata["finish"],
-            language="en",
-            edition_label="",
-            is_first_edition=False,
-            defaults={
-                "rarity": metadata["rarity"],
-                "current_value": Decimal("0.00"),
-            },
-        )
-        CardImage.objects.update_or_create(
-            card_variant=variant,
-            defaults={
-                "image_url": row["image_url"],
-                "image_hash": "",
-                "width": None,
-                "height": None,
-            },
-        )
+        import_row = {
+            "source_set_name": source_set_name,
+            "name": row["name"],
+            "caption": row["caption"],
+            "hp": _parse_int(row["hp"]),
+            "image_url": row["image_url"],
+            "collector_number": collector_number,
+            "rarity": metadata["rarity"],
+            "finish": metadata["finish"],
+            "subtype": metadata["subtype"],
+        }
+        import_rows.append(import_row)
+    return import_rows, skipped_count
+
+
+def _variant_key_from_object(variant):
+    return _variant_key(
+        card_id=variant.card_id,
+        set_id=variant.set_id,
+        collector_number=variant.collector_number,
+        finish=variant.finish,
+        language=variant.language,
+        edition_label=variant.edition_label,
+        is_first_edition=variant.is_first_edition,
+    )
+
+
+def _variant_key(*, card_id, set_id, collector_number, finish, language, edition_label, is_first_edition):
+    return (
+        card_id,
+        set_id,
+        collector_number,
+        finish,
+        language,
+        edition_label,
+        is_first_edition,
+    )
 
 
 def _collector_number(dataset_id, *, collector_total):

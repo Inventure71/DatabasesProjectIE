@@ -1,7 +1,7 @@
 {% extends "base.html" %}
 {% load static %}
 
-{% block title %}{{ listing.card.name }} Listing — Card Marketplace{% endblock %}
+{% block title %}{{ listing.card.name }} Listing — TCGNET{% endblock %}
 
 {% block content %}
 
@@ -23,7 +23,10 @@
         <h1 class="detail-meta__title">{{ listing.card.name }}</h1>
 
         <div class="detail-meta__value">
-            <span class="detail-meta__value-label">Listing Price</span>
+            <span class="detail-meta__value-label-row">
+                <span class="detail-meta__value-label">Listing Price</span>
+                {% include "components/query_explainer.html" with explainer=query_explainers.listing_detail only %}
+            </span>
             <span class="detail-meta__value-amount">${{ listing.price_per_unit }}</span>
         </div>
 
