@@ -2,15 +2,15 @@ QUERY_EXPLAINERS = {
     "monthly_showcase": {
         "id": "query-help-monthly-showcase",
         "title": "Monthly top sale query",
-        "summary": "Shows the highest unit-price completed sale in the current calendar month.",
+        "summary": "Asks for the highest unit-price completed sale from the current calendar month.",
         "path": "frontend.services.catalog_service.get_most_expensive_card_sold_this_month",
         "tables": "PurchaseOrderLine, PurchaseOrder, CardVariant, Card, CardGame, CardSet, CardImage",
         "steps": [
-            "Compute the first instant of the current month and the first instant of next month.",
-            "Filter purchase order lines to completed orders created inside that month.",
-            "Join the order, card, game, set, and image rows with select_related so the template does not trigger extra per-card queries.",
-            "Order by highest unit price, then newest purchase, then newest line id.",
-            "Read the first row and convert its CardVariant into the frontend card shape.",
+            "Define the month window with a start timestamp and an exclusive next-month timestamp.",
+            "Ask for purchase order lines whose orders are completed inside that month window.",
+            "Ask for the related order, card, game, set, and image rows in the same query path.",
+            "Order matching rows by highest unit price, newest purchase time, and newest line id.",
+            "Read the first matching row as the monthly top sale.",
         ],
         "orm": (
             "PurchaseOrderLine.objects.filter(\n"
@@ -25,15 +25,15 @@ QUERY_EXPLAINERS = {
     "latest_listings": {
         "id": "query-help-latest-listings",
         "title": "Latest listings query",
-        "summary": "Shows the newest active marketplace listings that still have stock available.",
+        "summary": "Asks for the newest active marketplace listings that still have stock available.",
         "path": "frontend.services.listing_service.list_listings",
         "tables": "MarketListing, InventoryItem, CardVariant, Card, CardGame, CardSet, CardImage, User",
         "steps": [
-            "Start from MarketListing rows where status is ACTIVE and quantity_available is greater than zero.",
-            "Join seller, inventory item, card variant, card, game, set, and image with select_related.",
-            "Apply any search/filter parameters when the same service is used from browsing pages.",
-            "Sort by newest created_at first, with id as a stable tie breaker.",
-            "Apply LIMIT 6 before rendering the home page so the database returns only the displayed rows.",
+            "Ask for MarketListing rows with ACTIVE status and quantity_available greater than zero.",
+            "Ask for seller, inventory item, card variant, card, game, set, and image rows through the listing relationship.",
+            "Apply any search or filter parameters supplied by the browsing surface.",
+            "Order listings by newest created_at value, then id for stable results.",
+            "Limit the answer to the six rows displayed on the home page.",
         ],
         "orm": (
             "MarketListing.objects.filter(\n"
@@ -45,17 +45,17 @@ QUERY_EXPLAINERS = {
     "featured_cards": {
         "id": "query-help-featured-cards",
         "title": "Featured cards query",
-        "summary": "Ranks this month's sold card variants, then fills any empty display slots from catalog variants.",
+        "summary": "Asks for this month's top sold variants and any fallback catalog variants needed for the display.",
         "path": "frontend.services.catalog_service.list_top_sold_cards_this_month",
         "tables": "PurchaseOrderLine, PurchaseOrder, CardVariant, Card, CardGame, CardSet, CardImage",
         "steps": [
-            "Filter purchase order lines to completed orders in the current calendar month.",
-            "Group those rows by card_variant_id.",
-            "Annotate each group with total quantity sold and total sales value.",
-            "Sort by most units sold, then highest sales total, then card_variant_id for stable output.",
-            "If fewer than six distinct sold variants exist, query CardVariant for the missing number of fallback catalog cards.",
-            "Exclude variants already selected from sales so the Featured Cards grid does not duplicate a card.",
-            "Fetch the selected CardVariant rows and convert them into frontend cards in priority order.",
+            "Ask for purchase order lines whose orders are completed inside the current calendar month.",
+            "Group the matching rows by card_variant_id.",
+            "Ask SQL to calculate total quantity sold and total sales value for each variant group.",
+            "Order variant groups by most units sold, highest sales value, and card_variant_id.",
+            "If the sales answer has fewer than six variants, ask CardVariant for the remaining display slots.",
+            "Filter fallback variants so already-selected sale variants are not repeated.",
+            "Read the selected CardVariant rows in display priority order.",
         ],
         "orm": (
             "PurchaseOrderLine.objects.filter(...).values('card_variant_id')\n"
@@ -68,17 +68,17 @@ QUERY_EXPLAINERS = {
     "catalog_results": {
         "id": "query-help-catalog-results",
         "title": "Catalog browser query",
-        "summary": "Searches and filters card variants, paginates cards, and groups book/shelf summaries in the database.",
+        "summary": "Asks for filtered card variants, paginated card rows, and grouped book/shelf summaries.",
         "path": "frontend.services.catalog_service.list_card_page + list_catalog_set_summaries",
         "tables": "CardVariant, Card, CardGame, CardSet, CardImage, MarketListing",
         "steps": [
-            "Start from CardVariant because inventory, listings, and pricing all depend on exact printings.",
-            "Join Card, CardGame, CardSet, and CardImage with select_related.",
-            "Apply the sidebar filters in SQL: PostgreSQL trigram similarity search over identity fields, plus game, set, rarity, language, and value range.",
-            "When Only available is checked, add an EXISTS subquery that looks for an active listing with available quantity for the same variant.",
-            "For card view, apply sort order, then Paginator adds LIMIT and OFFSET so only the visible page is read.",
-            "For book and shelf views, use GROUP BY with Count and Sum annotations so the database computes set/game totals.",
-            "Select one cover card per book or shelf with PostgreSQL DISTINCT ON instead of loading every matching card into Python.",
+            "Ask from CardVariant rows because each result represents an exact printing.",
+            "Ask for related Card, CardGame, CardSet, and CardImage rows through the variant relationship.",
+            "Apply sidebar filters in SQL: trigram identity search plus game, set, rarity, language, and value range.",
+            "When Only available is checked, ask EXISTS whether the same variant has an active listing with available quantity.",
+            "For card view, apply the selected sort order and ask for only the current page with LIMIT and OFFSET.",
+            "For book and shelf views, ask GROUP BY queries to calculate Count and Sum totals per set or game.",
+            "Ask PostgreSQL DISTINCT ON for one ordered cover card per book or shelf.",
         ],
         "orm": (
             "CardVariant.objects.select_related('card__game', 'set', 'image')\n"
@@ -94,15 +94,15 @@ QUERY_EXPLAINERS = {
     "active_listings": {
         "id": "query-help-active-listings",
         "title": "Card active listings query",
-        "summary": "Finds buyable listings for the exact card variant opened on the detail page.",
+        "summary": "Asks for buyable listings for the exact card variant opened on the detail page.",
         "path": "frontend.services.catalog_service.list_active_listings_for_variant",
         "tables": "MarketListing, InventoryItem, CardVariant, Card, CardGame, CardSet, CardImage, User",
         "steps": [
-            "Use the selected card_variant_id from the detail URL.",
-            "Filter listings to that variant through InventoryItem.card_variant_id.",
-            "Keep only ACTIVE listings with quantity_available greater than zero.",
-            "Join seller and card metadata with select_related.",
-            "Sort by lowest unit price first, then id, so cheaper buy options appear first.",
+            "Use the selected card_variant_id from the detail URL as the lookup value.",
+            "Ask for listings whose InventoryItem points to that variant.",
+            "Filter to ACTIVE listings with quantity_available greater than zero.",
+            "Ask for seller and card metadata rows through the listing relationship.",
+            "Order by lowest unit price first, then id for stable buy options.",
         ],
         "orm": (
             "MarketListing.objects.filter(\n"
@@ -115,15 +115,15 @@ QUERY_EXPLAINERS = {
     "your_copies": {
         "id": "query-help-your-copies",
         "title": "Your copies query",
-        "summary": "Loads the signed-in user's owned inventory rows for this exact card variant.",
+        "summary": "Asks for the signed-in user's owned inventory rows for this exact card variant.",
         "path": "frontend.services.backend_api.list_my_inventory_for_variant",
         "tables": "InventoryItem, MarketListing, CardVariant, Card, CardGame, CardSet, CardImage",
         "steps": [
-            "Filter InventoryItem to owner=request.user so users can only see their own stock.",
+            "Ask for InventoryItem rows owned by request.user.",
             "Filter to the current card_variant_id from the detail page.",
-            "Ignore zero-quantity inventory rows in the frontend owned-card view.",
-            "Join card metadata with select_related.",
-            "Prefetch active listings for each inventory row so listed quantity can be shown without N+1 queries.",
+            "Filter to rows with quantity greater than zero.",
+            "Ask for card metadata rows through the inventory relationship.",
+            "Ask for active listing rows linked to those inventory rows so listed quantity is available with the answer.",
         ],
         "orm": (
             "InventoryItem.objects.filter(owner=user, quantity__gt=0, card_variant_id=variant_id)\n"
@@ -134,15 +134,15 @@ QUERY_EXPLAINERS = {
     "price_history": {
         "id": "query-help-price-history",
         "title": "Price history query",
-        "summary": "Reads the newest stored price snapshots for the exact card variant.",
+        "summary": "Asks for the newest stored price snapshots for the exact card variant.",
         "path": "frontend.services.catalog_service.build_price_history",
         "tables": "PriceSnapshot, CardVariant",
         "steps": [
-            "Read the current card variant id from the detail card data.",
-            "Filter PriceSnapshot rows to that card_variant_id.",
-            "Sort newest captured_at first, then newest id for stable ordering.",
-            "Apply LIMIT 24 so long histories do not load every stored snapshot.",
-            "Return date, price, and source name for the displayed snapshots.",
+            "Use the current card variant id from the detail card data.",
+            "Ask for PriceSnapshot rows with that card_variant_id.",
+            "Order snapshots by newest captured_at value, then newest id for stable results.",
+            "Limit the answer to the 24 newest snapshots.",
+            "Read date, price, and source name from the returned rows.",
         ],
         "orm": (
             "PriceSnapshot.objects.filter(card_variant_id=variant_id)\n"
@@ -152,15 +152,15 @@ QUERY_EXPLAINERS = {
     "similar_cards": {
         "id": "query-help-similar-cards",
         "title": "Similar cards query",
-        "summary": "Finds nearby catalog variants using simple database metadata.",
+        "summary": "Asks for nearby catalog variants using simple database metadata.",
         "path": "frontend.services.catalog_service.list_similar_cards",
         "tables": "CardVariant, Card, CardGame, CardSet, CardImage",
         "steps": [
             "Use the opened card's game and rarity as the similarity criteria.",
-            "Filter CardVariant rows to the same game and rarity.",
-            "Exclude the current Card id.",
-            "Join card, game, set, and image data with select_related.",
-            "Sort by card name and id, then limit to six cards.",
+            "Ask for CardVariant rows with the same game and rarity.",
+            "Filter out rows that belong to the currently opened Card id.",
+            "Ask for related card, game, set, and image data through the variant relationship.",
+            "Order by card name and id, then limit the answer to six cards.",
         ],
         "orm": (
             "CardVariant.objects.select_related(...)\n"
@@ -172,14 +172,14 @@ QUERY_EXPLAINERS = {
     "collection_summary": {
         "id": "query-help-collection-summary",
         "title": "Collection summary query",
-        "summary": "Computes the signed-in user's owned, available, and reserved inventory totals with SQL aggregates.",
+        "summary": "Asks SQL to compute the signed-in user's owned, available, and reserved inventory totals.",
         "path": "frontend.services.backend_api.get_inventory_summary",
         "tables": "InventoryItem",
         "steps": [
-            "Filter InventoryItem rows to owner=request.user and quantity greater than zero.",
+            "Ask for InventoryItem rows owned by request.user with quantity greater than zero.",
             "Ask the database to SUM owned quantity.",
             "Ask the database to SUM reserved_quantity.",
-            "Compute available quantity as SUM(quantity - reserved_quantity).",
+            "Ask the database to calculate available quantity as SUM(quantity - reserved_quantity).",
             "Ask pricing services for estimated collection value through its own owner-scoped aggregate query.",
         ],
         "orm": (
@@ -193,17 +193,17 @@ QUERY_EXPLAINERS = {
     "collection_browser": {
         "id": "query-help-collection-browser",
         "title": "Owned inventory browser query",
-        "summary": "Shows the signed-in user's owned inventory as cards, set books, or shelves.",
+        "summary": "Asks for the signed-in user's owned inventory as cards, set books, or shelves.",
         "path": "frontend.services.backend_api.list_my_inventory_page + list_collection_set_summaries",
         "tables": "InventoryItem, MarketListing, CardVariant, Card, CardGame, CardSet, CardImage",
         "steps": [
-            "Start from InventoryItem rows owned by request.user with quantity greater than zero.",
+            "Ask for InventoryItem rows owned by request.user with quantity greater than zero.",
             "Apply browser filters in SQL: PostgreSQL trigram similarity search, game, set, rarity, language, value range, and listed-only state.",
-            "For listed-only filtering, use an EXISTS subquery against active MarketListing rows for the inventory item.",
-            "For card view, Paginator applies LIMIT 12/OFFSET before inventory rows are converted for templates.",
-            "For set books and game shelves, GROUP BY set or game and annotate Count, Sum(quantity), and Sum(quantity * current_value).",
-            "Select one cover card per book or shelf with PostgreSQL DISTINCT ON.",
-            "Prefetch active listings only for the visible card or cover rows so listed quantity pills avoid N+1 queries.",
+            "For listed-only filtering, ask EXISTS whether each inventory item has an active MarketListing row.",
+            "For card view, ask for only the current inventory page with LIMIT 12 and OFFSET.",
+            "For set books and game shelves, ask GROUP BY queries to calculate Count, Sum(quantity), and Sum(quantity * current_value).",
+            "Ask PostgreSQL DISTINCT ON for one ordered cover card per book or shelf.",
+            "Ask for active listing rows only for the visible card or cover rows so listed quantities are available with the answer.",
         ],
         "orm": (
             "InventoryItem.objects.filter(owner=user, quantity__gt=0).filter(...)\n"
@@ -217,15 +217,15 @@ QUERY_EXPLAINERS = {
     "listing_detail": {
         "id": "query-help-listing-detail",
         "title": "Listing detail query",
-        "summary": "Loads one buyable listing and its related card data.",
+        "summary": "Asks for one buyable listing and its related card data.",
         "path": "frontend.services.listing_service.get_listing",
         "tables": "MarketListing, InventoryItem, CardVariant, Card, CardGame, CardSet, CardImage, User",
         "steps": [
-            "Start from the active listing queryset shared with marketplace browsing.",
+            "Ask for listings with ACTIVE status and quantity_available greater than zero.",
             "Filter by the listing id from the URL.",
-            "Reject inactive, paused, cancelled, sold-out, or unavailable listings by returning no row.",
-            "Join seller and card metadata with select_related.",
-            "Convert the listing into the template's frontend listing shape.",
+            "Return no row when the listing is inactive, paused, cancelled, sold out, or unavailable.",
+            "Ask for seller and card metadata rows through the listing relationship.",
+            "Read the matching listing row for the detail template.",
         ],
         "orm": (
             "MarketListing.objects.filter(status=ACTIVE, quantity_available__gt=0)\n"
