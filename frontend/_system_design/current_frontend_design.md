@@ -9,7 +9,9 @@ the same Django runtime as the backend, but it has separate ownership.
 - `frontend/static/` owns CSS and browser assets.
 - `frontend/views.py` owns page orchestration only.
 - `frontend/services/` owns the data contract used by frontend views.
-- `frontend/mock_api/` owns simulated JSON endpoints for frontend JavaScript.
+- There is no mounted mock API. Real backend endpoints own `/api/...`, and
+  frontend pages use service-backed Django data access instead of fake JSON
+  routes.
 
 ## Data Boundary
 
