@@ -120,3 +120,16 @@ Run the test suite:
 ```bash
 python manage.py test common catalog users inventory marketplace pricing frontend --keepdb
 ```
+
+## Notable Features
+
+This project is intended to show real database design, not only a web UI.
+
+- Normalized PostgreSQL schema for catalog data, exact card printings, user inventory, marketplace listings, purchase orders, order lines, and price history.
+- Foreign-key relationships preserve the data model: users own `InventoryItem` rows, listings reference owned inventory, order lines preserve purchased variant/price history, and price snapshots belong to exact `CardVariant` rows.
+- Database constraints protect core rules, including unique set codes per game, unique card printings, non-negative prices and quantities, reserved stock not exceeding owned stock, positive listing/order quantities, and buyer-not-seller orders.
+- Marketplace stock changes use database transactions and row locks so listing creation, cancellation, and purchases update inventory consistently.
+- PostgreSQL-specific search uses `pg_trgm` plus GIN trigram indexes for card names, types, subtypes, artists, collector numbers, and edition labels.
+- Partial indexes support common active-record queries such as active marketplace listings and non-empty inventory rows.
+- Query-heavy pages use SQL aggregation, `GROUP BY`, `SUM`, `COUNT`, `EXISTS`, pagination, and PostgreSQL `DISTINCT ON` instead of loading full tables into Python first.
+- The `?` query walkthrough buttons in the website explain the real Django ORM/database path for major query-backed sections.

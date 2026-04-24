@@ -61,6 +61,24 @@ Current backend wiring:
   inventory management, marketplace listing creation, marketplace purchases,
   purchase/sales history, price history, and collection valuation.
 
+Database-class visibility:
+
+- The frontend intentionally exposes database-backed behavior through `?`
+  query walkthrough buttons near major query-driven sections. These explain the
+  service path, the tables involved, the filtering/grouping/order steps, and
+  the rough Django ORM shape.
+- Catalog browsing demonstrates structured filters, PostgreSQL trigram search,
+  GIN indexes, active-listing `EXISTS` filters, and SQL pagination.
+- Collection browsing demonstrates owner-scoped inventory queries, SQL
+  aggregates, `GROUP BY` set/game summaries, listed-only `EXISTS` filtering,
+  and PostgreSQL `DISTINCT ON` cover selection.
+- Home-page featured cards and monthly showcase demonstrate sales aggregation
+  over completed `PurchaseOrderLine` records.
+- Listing detail and card detail pages demonstrate transactional marketplace
+  workflow integration: visible buy/list/add-to-collection actions call backend
+  services that reserve stock, update inventory, create orders, and write price
+  history.
+
 Current frontend UI boundary:
 
 - Catalog/listing/home/detail pages are wired to real backend data.

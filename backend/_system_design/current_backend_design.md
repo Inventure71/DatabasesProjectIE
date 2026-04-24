@@ -134,9 +134,11 @@ Implementation:
 - `users.serializers.CurrentUserSerializer`
 - `users.serializers.UserProfileSerializer`
 
-## Planned Catalog, Inventory, And Marketplace References
+## Schema And ERD Reference
 
-The backend should reference cards through foreign keys, not by copying card names or text between tables.
+The backend references cards and marketplace records through foreign keys, not
+by copying card names or text between tables. This is the submission-facing ERD
+shape in text form.
 
 Reference overview:
 
@@ -190,10 +192,110 @@ Rule:
 - Order lines snapshot `CardVariant`, quantity, and price so transaction history stays readable even if listings change later.
 - Pricing snapshots reference `CardVariant` because price history belongs to an exact variant, not to an abstract card.
 
-Staged migration note:
+Normalization summary:
 
-- `InventoryHistory.related_listing_id` and `InventoryHistory.related_order_id` are intentionally not implemented yet.
-- They should be added after `MarketListing` and `PurchaseOrder` exist.
+- `CardGame`, `CardSet`, `Card`, and `CardVariant` separate franchise, set,
+  abstract card identity, and exact printing/version data.
+- `CardImage` is one-to-one with `CardVariant` so image metadata belongs to the
+  exact printing being shown.
+- `InventoryItem` stores aggregate owned stock for one owner, variant, and
+  condition. Duplicate owned copies increase quantity instead of creating
+  repeated rows for the same logical stock bucket.
+- `MarketListing` references `InventoryItem`, proving listings can only be
+  created from stock owned by the seller.
+- `PurchaseOrder` stores buyer/seller transaction headers, while
+  `PurchaseOrderLine` stores purchased variant, listing, quantity, and unit
+  price details.
+- `PriceSnapshot` stores price history separately from `CardVariant`; the
+  variant's `current_value` is a cached current estimate derived from snapshots.
+
+## Database Constraints
+
+The schema uses database constraints for rules that should not depend only on
+page or API behavior:
+
+- `unique_set_code_per_game` prevents duplicate set codes inside a game.
+- `unique_card_variant_printing` prevents duplicate exact printings for the
+  same card, set, collector number, finish, language, edition label, and first
+  edition flag.
+- `unique_inventory_owner_variant_condition` keeps inventory normalized as one
+  aggregate bucket per owner, variant, and condition.
+- Quantity and money checks reject negative card values, inventory quantity,
+  reserved quantity, purchase price, listing price, order totals, and order-line
+  prices.
+- `inventory_reserved_not_above_quantity` ensures reserved stock cannot exceed
+  total owned stock.
+- Listing and order-line quantity constraints require positive quantities.
+- `order_buyer_not_seller` prevents a user from buying from themselves at the
+  database level.
+
+Cross-table rules such as "listing inventory must belong to the seller" and
+"order-line variant must match the listing's inventory variant" are enforced in
+model/service validation because they depend on multiple related rows.
+
+## Transaction And Locking Walkthrough
+
+Marketplace stock changes use `transaction.atomic()` and `select_for_update()`
+because inventory is shared mutable data.
+
+Listing creation:
+
+1. Lock the seller's `InventoryItem`.
+2. Check the seller owns the inventory and has enough available quantity.
+3. Increase `reserved_quantity`.
+4. Create an active `MarketListing` with matching `quantity_available`.
+5. Write an `InventoryHistory` reservation entry.
+
+Purchase flow:
+
+1. Lock the `MarketListing` and the seller's `InventoryItem`.
+2. Reject self-purchase, inactive listing purchase, over-purchase, or inconsistent reserved stock.
+3. Create a `PurchaseOrder` and `PurchaseOrderLine`.
+4. Decrease seller `quantity` and `reserved_quantity`.
+5. Merge the purchased copy into the buyer's aggregate `InventoryItem` bucket.
+6. Decrease listing `quantity_available` and mark it sold out when it reaches zero.
+7. Mark the order completed and write a `PriceSnapshot` from the marketplace sale.
+
+Cancellation flow:
+
+1. Lock the listing.
+2. Validate the requesting user is the seller.
+3. Release the listing's remaining available reserved quantity.
+4. Mark the listing cancelled and set available quantity to zero.
+
+This design keeps catalog data, inventory stock, listing state, order history,
+and price history consistent even when multiple users interact with the same
+listing.
+
+## Index And Query Strategy
+
+PostgreSQL indexes are chosen around the actual query paths:
+
+- B-tree indexes support exact/filter lookups such as card name, game/name,
+  set/rarity, current value, seller/status, listing status/price, order
+  buyer/status, order seller/status, and price source/capture time.
+- `pg_trgm` plus GIN trigram indexes support fuzzy catalog search over card
+  name, card type, subtype, artist, collector number, and edition label.
+- Partial indexes speed up common active-state queries: active listings with
+  available quantity and non-empty owner inventory rows.
+- `price_variant_latest_idx` supports recent price-history and latest-value
+  lookups ordered by variant, descending capture time, and descending id.
+
+Representative database-backed query patterns:
+
+- Catalog browsing applies structured filters for game, set, rarity, language,
+  price, and availability, then paginates in SQL.
+- Catalog free-text search uses PostgreSQL trigram similarity over identity and
+  descriptive fields rather than mixing filters into text search.
+- Available-only catalog browsing uses an `EXISTS` subquery against active
+  marketplace listings.
+- Collection summaries use SQL `SUM`, `COUNT`, and arithmetic expressions for
+  owned, reserved, available, and total value calculations.
+- Set-book and game-shelf views use SQL `GROUP BY` summaries.
+- Cover-card selection uses PostgreSQL `DISTINCT ON` instead of materializing
+  every possible row in Python.
+- Home-page sales sections group `PurchaseOrderLine` rows by `CardVariant` and
+  order by sold quantity and sales value.
 
 ## Catalog
 
