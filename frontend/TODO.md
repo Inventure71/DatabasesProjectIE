@@ -43,6 +43,7 @@ This file tracks frontend work now that `frontend/` is a sibling Django app.
 - [x] Home latest listings now appear above featured cards, and their browse link opens the shared catalog browser filtered to available cards.
 - [x] Home Featured Cards fills unsold display slots from catalog variants when fewer than six distinct cards were sold this month.
 - [x] Database-backed frontend sections now include query walkthrough popups that explain the relevant Django ORM path, tables, filtering steps, ordering, and limits.
+- [x] Query walkthrough popup copy now explains each operation as a clean database request, with correction-style phrasing removed from popup content.
 - [x] Collection summary totals, owned-card pagination, listed-only filtering, and set/shelf summaries now use SQL aggregates, `EXISTS`, `DISTINCT ON`, and `LIMIT` instead of materializing the whole collection first.
 - [x] Visible website brand and page-title references now use `TCGNET`.
 - [x] Catalog and collection set filters now require a selected game, only show sets for that game, and ignore stale set filters from other games.
@@ -87,6 +88,7 @@ This file tracks frontend work now that `frontend/` is a sibling Django app.
 - [x] Verified catalog/listings unification and home latest-listings ordering with focused frontend regression tests.
 - [x] Verified Featured Cards fallback fills missing sale slots from catalog variants without duplicating sold variants.
 - [x] Verified query walkthrough popups render on home, catalog, card detail, collection, and listing detail pages with focused frontend regression tests.
+- [x] Verified on 2026-04-24 that all 11 query walkthrough popup records import, compile, and contain no correction-style phrasing in popup source.
 - [x] Verified database-focused catalog and collection query behavior with regression tests for PostgreSQL trigram search, SQL `GROUP BY`, SQL aggregates, SQL `LIMIT`, PostgreSQL `DISTINCT ON`, and limited price history.
 - [x] Verified `TCGNET` website-name replacement with a frontend text scan and focused frontend tests.
 - [x] Verified dependent game/set filter behavior with focused frontend regression tests and the full frontend test suite.
